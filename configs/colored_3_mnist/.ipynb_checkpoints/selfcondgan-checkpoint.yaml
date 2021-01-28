@@ -1,0 +1,16 @@
+generator:
+  nlabels: 100
+  conditioning: embedding
+discriminator:
+  nlabels: 100
+  conditioning: mask
+clusterer:
+  name: selfcondgan
+  kwargs: 
+    k_valueGlobal: 100
+    k_valueLocal: 100
+    localFeatLevel: 8
+inherit_from: configs/colored_3_mnist/default.yaml
+training:
+  out_dir: output/stacked_mnist/selfcondgan
+  recluster_every: 5000

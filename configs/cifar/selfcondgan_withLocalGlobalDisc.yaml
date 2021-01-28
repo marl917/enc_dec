@@ -1,0 +1,36 @@
+decoder:
+  name: dcgan_deep_onlylocal_clust
+  deterministicOnSeg: False
+  nlabels: 1
+  n_locallabels: 50
+encoder:
+  name: dcgan_deep_onlylocal_clust
+  nlabels: 1
+  n_locallabels: 50
+discriminator:
+  name: dcgan_deep_onlylocal_clust_LocalGlob
+  nlabels: 1
+  n_locallabels: 50
+label_generator:
+  label_size: 8
+  name: dcgan_label_gen
+  nlabels: 1
+  n_locallabels: 50
+  conditioning: unconditional
+label_discriminator:
+  label_size: 8
+  name: dcgan_label_gen
+  nlabels: 1
+  n_locallabels: 50
+  conditioning: unconditional
+inherit_from: configs/cifar/default.yaml
+training:
+  out_dir: output/cifar/K2_50_withLocalGlobalDisc_weightInit
+  labRecon_true_equ: False
+  recon_loss_label: False
+  use_disc: True
+  recon_loss_img: False
+  featureMatchingLoss: False
+  vgg_loss: False
+  equiv_loss: False
+  con_loss: False

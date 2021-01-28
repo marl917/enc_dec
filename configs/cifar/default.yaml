@@ -1,0 +1,47 @@
+data:
+  type: cifar10
+  train_dir: data/CIFAR
+  img_size: 32
+  nlabels: 10
+decoder:
+  name: dcgan_deep_local_clust
+  nlabels: 1
+  conditioning: unconditional
+  kwargs:
+    placeholder: None
+encoder:
+  name: dcgan_deep_local_clust
+  nlabels: 1
+  conditioning: unconditional
+  kwargs:
+    placeholder: None
+label_generator:
+  name: dcgan_label_gen
+  zdim: 6
+  kwargs:
+    placeholder: None
+label_discriminator:
+  label_size: 8
+  name: dcgan_label_gen
+  nlabels: 1
+  n_locallabels: 50
+  conditioning: unconditional
+  kwargs:
+    placeholder: None
+z_dist:
+  type: uniform
+  dim: 128
+clusterer:
+  name: supervised
+  nimgs: 10000
+  kwargs: 
+    placeholder: None
+training:
+  gan_type: standard
+  reg_type: none
+  reg_param: 0.
+  take_model_average: false
+  sample_nlabels: 20
+  log_every: 1000
+  inception_every: 10000
+  batch_size: 64

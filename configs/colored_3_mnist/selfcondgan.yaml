@@ -1,0 +1,18 @@
+generator:
+  nlabels: 100
+  n_locallabels: 30
+  conditioning: embedding
+discriminator:
+  nlabels: 100
+  n_locallabels: 30
+  conditioning: mask
+clusterer:
+  name: selfcondgan
+  kwargs: 
+    k_valueGlobal: 100
+    k_valueLocal: 30
+    localFeatLevel: 8
+inherit_from: configs/colored_3_mnist/default.yaml
+training:
+  out_dir: output/colored_3_mnist/test
+  recluster_every: 5000
