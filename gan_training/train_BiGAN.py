@@ -78,7 +78,7 @@ class Trainer(object):
 
         # first part : train label generator and img decoder
         seg_fake_unorm, seg_fake = self.label_generator(z_lab)
-        x_fake = self.decoder(seg = seg_fake.detach(), input = z)  #seg fake detach
+        x_fake = self.decoder(seg = seg_fake, input = z)  #seg fake detach
         g_fake = self.discriminator(x_fake,  seg=seg_fake)
 
         con_loss = torch.tensor(0., device='cuda')

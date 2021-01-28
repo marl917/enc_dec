@@ -10,6 +10,7 @@ class Evaluator(object):
                  decoder,
                  encoder,
                  zdist,
+                 zdist_lab,
                  train_loader,
                  batch_size=64,
                  inception_nsamples=10000,
@@ -21,6 +22,7 @@ class Evaluator(object):
         self.encoder = encoder
         self.train_loader = train_loader
         self.zdist = zdist
+        self.zdist_lab = zdist_lab
         self.inception_nsamples = inception_nsamples
         self.batch_size = batch_size
         self.device = device
@@ -29,6 +31,9 @@ class Evaluator(object):
 
     def sample_z(self, batch_size):
         return self.zdist.sample((batch_size, )).to(self.device)
+
+    def sample_z_lab(self, batch_size):
+        return self.zdist_lab.sample((batch_size, )).to(self.device)
 
     def get_y(self, x, y):
         return self.clusterer.get_Globallabels(x, y).to(self.device)
@@ -53,7 +58,7 @@ class Evaluator(object):
                     if not labelgen:
                         _,label_map = self.encoder(x_real)
                     else:
-                        z_lab = self.sample_z(x_real.size(0))
+                        z_lab = self.sample_z_lab(x_real.size(0))
                         _,label_map = self.label_generator(z_lab)
                         # z_fake = torch.randn(x_real.size(0), 256, 1, 1, device='cuda')
                     # samples = self.decoder(z_fake)

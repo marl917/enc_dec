@@ -243,6 +243,7 @@ def main():
         decoder_test,
         encoder,
         zdist,
+        zdist_lab,
         label_generator = label_generator,
         train_loader=train_loader,
         batch_size=batch_size,
@@ -303,7 +304,7 @@ def main():
 
 
             # (ii) Compute inception if necessary
-            if it % inception_every == 0 and it > 0:
+            if (it -1) % inception_every == 0 and it > 0 or it == 5001:
                 print('PyTorch Inception score...')
                 inception_mean_label, inception_std_label = evaluator.compute_inception_score(labelgen=True)
                 logger.add('metrics', 'pt_inception_mean', inception_mean_label, it=it)
