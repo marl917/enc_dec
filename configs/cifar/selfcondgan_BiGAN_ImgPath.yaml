@@ -1,0 +1,33 @@
+decoder:
+  name: dcgan_deep_onlylocal_clust
+  deterministicOnSeg: True
+  nlabels: 1
+  n_locallabels: 10
+encoder:
+  name: dcgan_deep_onlylocal_clust
+  nlabels: 1
+  n_locallabels: 10
+discriminator:
+  name: dcgan_deep_onlylocal_clust_bigan
+  kwargs:
+    qhead_withImg: True
+    img_path: True
+  nlabels: 1
+  n_locallabels: 10
+label_generator:
+  label_size: 8
+  name: dcgan_label_gen
+  nlabels: 1
+  n_locallabels: 10
+  conditioning: unconditional
+label_discriminator:
+  label_size: 8
+  name: dcgan_label_gen
+  nlabels: 1
+  n_locallabels: 10
+  conditioning: unconditional
+inherit_from: configs/cifar/default.yaml
+training:
+  out_dir: output/cifar/K2_10_BiGAN_DecdetOnSeg_CONLOSS_ImgSeg_ImgPath
+  use_disc: True
+  con_loss: True

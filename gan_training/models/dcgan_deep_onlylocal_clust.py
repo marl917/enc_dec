@@ -149,7 +149,7 @@ class BiGANDiscriminator(nn.Module):
                  features='penultimate',
                  pack_size=1,
                  qhead_withImg=False,
-
+                 img_path=False,
                  nc=3,
                  ndf=64,
                  size=0,
@@ -161,6 +161,7 @@ class BiGANDiscriminator(nn.Module):
         self.local_nlabels = local_nlabels
 
         self.qhead_withImg = qhead_withImg
+        self.img_path = img_path
 
         input_nc = 3
         self.final_res = size // (2 ** 3)  # if conv5 and conv6 are added
@@ -186,6 +187,14 @@ class BiGANDiscriminator(nn.Module):
                                    nn.BatchNorm2d(ndf * 4),
                                    nn.LeakyReLU(0.2, inplace=True))
 
+        self.conv6 = nn.Sequential(nn.Conv2d(ndf * 4, ndf * 8, 3, 1, 1),
+                                   nn.BatchNorm2d(ndf * 8),
+                                   nn.LeakyReLU(0.2, inplace=True))
+        if self.img_path:
+            self.conv7 = nn.Sequential(nn.Conv2d(ndf * 8, ndf * 8, 4, 2, 1),
+                                       nn.BatchNorm2d(ndf * 8),
+                                       nn.LeakyReLU(0.2, inplace=True))
+            self.fc_out_img = nn.Sequential(nn.Conv2d(ndf * 8, 1, 1, stride=1, bias=False), nn.LeakyReLU(0.2, inplace=True))
 
 
         #inference over seg
@@ -232,7 +241,18 @@ class BiGANDiscriminator(nn.Module):
         else:
             forQdisc = inputbis
 
-        return forQdisc, xseg
+        if not self.img_path:
+            return forQdisc, xseg
+        else:
+            input = self.conv6(inputbis)
+            input = self.conv7(input)
+            input = self.fc_out_img(input)
+            # print("img path", input.size())
+            return forQdisc, xseg, input
+
+
+
+
 
 
 class BiGANQHeadDiscriminator(nn.Module):

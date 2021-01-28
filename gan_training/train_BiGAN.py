@@ -85,7 +85,6 @@ class Trainer(object):
         if self.con_loss:
             mu, var = self.qhead_discriminator(g_fake[0])
             con_loss = self.normalNLLLoss(z_lab,mu,var) * 0.1
-
         #second part : train encoder
         label_map_real_unorm, label_map_real= self.encoder(x_real)
         g_real_enc = self.discriminator(x_real, seg=label_map_real)

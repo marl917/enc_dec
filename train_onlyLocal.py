@@ -304,7 +304,7 @@ def main():
 
 
             # (ii) Compute inception if necessary
-            if (it -1) % inception_every == 0 and it > 0 or it == 5001:
+            if (it -1) % inception_every == 0 and it > 1 or it == 5001:
                 print('PyTorch Inception score...')
                 inception_mean_label, inception_std_label = evaluator.compute_inception_score(labelgen=True)
                 logger.add('metrics', 'pt_inception_mean', inception_mean_label, it=it)
