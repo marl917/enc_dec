@@ -66,7 +66,7 @@ class SeededSampler():
             drop_last=True)
 
         self.zdist = get_zdist(self.config['z_dist']['type'], self.config['z_dist']['dim'])
-
+        self.zdist_lab = get_zdist(self.config['z_dist']['type'], self.config['label_generator']['zdim'])
     def sample(self, nimgs):
         '''
         samples an image using the generator, with z drawn from isotropic gaussian, and y drawn from self.yz_dist.
@@ -96,11 +96,11 @@ class SeededSampler():
         self.encoderOrLabGen.eval()
         with torch.no_grad():
 
-            z_lab = self.zdist.sample((self.batch_size,))
+            z_lab = self.zdist_lab.sample((self.batch_size,))
             z = self.zdist.sample((self.batch_size,))
             _,input_semantics = self.encoderOrLabGen(z_lab)
 
-        return self.decoder(z, seg= input_semantics)[:nimgs, :, :, :], None
+        return self.decoder(seg= input_semantics, input = z)[:nimgs, :, :, :], None
 
     def conditional_sample(self, yi, seed=None):
         ''' returns a generated sample, which is in [-1, 1], seed is an int'''
@@ -174,7 +174,8 @@ class SeededSampler():
         else:
 
             # decoder, encoder, label_generator, _, _ = build_models(self.config)
-            decoder, encoder, discriminator, label_generator, label_discriminator = build_models(self.config)
+            decoder, encoder, discriminator, label_generator, _, qhead_discriminator = build_models(self.config)
+            # decoder, encoder, discriminator, label_generator, label_discriminator = build_models(self.config)
             print("size img config" , self.config['data']['img_size'])
             label_generator = label_generator.to(self.device)
             label_generator = nn.DataParallel(label_generator)
