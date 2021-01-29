@@ -205,7 +205,8 @@ class BiGANDiscriminator(nn.Module):
         self.conv1xz = nn.Sequential(nn.Conv2d(ndf * 8, ndf * 8, 1, stride=1, bias=False), nn.LeakyReLU(0.2, inplace=True))
         self.conv2xz = nn.Sequential(nn.Conv2d(ndf * 8, ndf * 8, 1, stride=1, bias=False), nn.LeakyReLU(0.2, inplace=True))
         self.conv3xz = nn.Sequential(nn.Conv2d(ndf * 8, 1, 1, stride=1, bias=False), nn.LeakyReLU(0.2, inplace=True))
-        self.fc_out_joint = blocks.LinearUnconditionalLogits(8*8)
+        #comment fc_out_joint to ouput a map of 8x8 to compute bin crossentropy on that :
+        # self.fc_out_joint = blocks.LinearUnconditionalLogits(8*8)
 
     def inf_x(self, img):
         out = self.conv1(img)   #to try : with dropout as in initial bigan model
@@ -224,8 +225,8 @@ class BiGANDiscriminator(nn.Module):
         out = self.conv1xz(xseg)
         forQdisc = self.conv2xz(out)
         out = self.conv3xz(forQdisc)
-        out = out.view(out.size(0), -1)
-        out = self.fc_out_joint(out)
+        # out = out.view(out.size(0), -1)
+        # out = self.fc_out_joint(out)
         return forQdisc, out
 
 
