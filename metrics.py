@@ -145,7 +145,7 @@ while len(dirs) > 0:
                                                 model_path=os.path.join(root, checkpoint_dir, checkpoint),
                                                 pretrained=config['pretrained'],
                                                 useLabelGen=args.useLabelGen,
-                                                iteration_label_gen=args.it_lab)
+                                                iteration_label_gen=int(it))
                         dataset_name = get_dataset_from_path(path)
 
                         samples = sample(sampler, args.useLabelGen)

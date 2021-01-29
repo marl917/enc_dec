@@ -95,7 +95,6 @@ class SeededSampler():
         self.decoder.eval()
         self.encoderOrLabGen.eval()
         with torch.no_grad():
-
             z_lab = self.zdist_lab.sample((self.batch_size,))
             z = self.zdist.sample((self.batch_size,))
             _,input_semantics = self.encoderOrLabGen(z_lab)
