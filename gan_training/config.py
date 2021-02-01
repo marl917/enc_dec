@@ -73,38 +73,37 @@ def build_models(config):
     encoder = Encoder(
         nlabels=config['encoder']['nlabels'],
         local_nlabels=config['encoder']['n_locallabels'],
-        size=config['data']['img_size'],
+        img_size=config['data']['img_size'],
         **config['encoder']['kwargs'])
 
     discriminator = None
     qhead_discriminator = None
-    if config['training']['use_disc']:
-        Discriminator = discriminator_dict[config['discriminator']['name']]
-        discriminator = Discriminator(z_dim=config['z_dist']['dim'],
-                          nlabels=config['discriminator']['nlabels'],
-                          local_nlabels=config['discriminator']['n_locallabels'],
-                          size=config['data']['img_size'],
-                          **config['discriminator']['kwargs'])
 
-        Label_generator = label_generator_dict[config['label_generator']['name']]
-        label_generator = Label_generator(z_dim=config['label_generator']['zdim'],
-                          nlabels=config['label_generator']['nlabels'],
-                          local_nlabels = config['label_generator']['n_locallabels'],
-                          size=config['label_generator']['label_size'],
-                          conditioning = config['label_generator']['conditioning'],
-                          **config['label_generator']['kwargs'])
+    Discriminator = discriminator_dict[config['discriminator']['name']]
+    discriminator = Discriminator(z_dim=config['z_dist']['dim'],
+                      nlabels=config['discriminator']['nlabels'],
+                      local_nlabels=config['discriminator']['n_locallabels'],
+                      img_size=config['data']['img_size'],
+                      label_size=config['label_generator']['label_size'],
+                      **config['discriminator']['kwargs'])
 
-        if config['discriminator']['name'] == 'dcgan_deep_onlylocal_clust_bigan':
-            Qhead_discriminator = qhead_discriminator_dict[config['discriminator']['name']]
-            qhead_discriminator = Qhead_discriminator(z_dim=config['label_generator']['zdim'],
-                          nlabels=config['discriminator']['nlabels'],
-                          local_nlabels=config['discriminator']['n_locallabels'],
-                          size=config['data']['img_size'],
-                          **config['discriminator']['kwargs'])
+    Label_generator = label_generator_dict[config['label_generator']['name']]
+    label_generator = Label_generator(z_dim=config['label_generator']['zdim'],
+                      nlabels=config['label_generator']['nlabels'],
+                      local_nlabels = config['label_generator']['n_locallabels'],
+                      label_size=config['label_generator']['label_size'],
+                      conditioning = config['label_generator']['conditioning'],
+                      **config['label_generator']['kwargs'])
 
 
+    Qhead_discriminator = qhead_discriminator_dict[config['discriminator']['name']]
+    qhead_discriminator = Qhead_discriminator(z_dim=config['label_generator']['zdim'],
+                  nlabels=config['discriminator']['nlabels'],
+                  local_nlabels=config['discriminator']['n_locallabels'],
+                  size=config['label_generator']['label_size'],
+                  **config['discriminator']['kwargs'])
 
-    return decoder, encoder, discriminator, label_generator, None, qhead_discriminator
+    return decoder, encoder, discriminator, label_generator, qhead_discriminator
 
 
 

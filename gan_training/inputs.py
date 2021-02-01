@@ -1,4 +1,5 @@
 import torch
+import torchvision
 import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 import numpy as np
@@ -45,6 +46,12 @@ def get_dataset(name,
         # Only support normalization for now
         dataset = datasets.DatasetFolder(data_dir, npy_loader, ['npy'])
         nlabels = len(dataset.classes)
+    elif name == 'lsun':
+        dataset = datasets.LSUN(root='data/lsun/train',
+                                   classes=['church_outdoor_train'],
+                                   transform=transform)
+        nlabels = 1
+
     elif name == 'cifar10':
         dataset = datasets.CIFAR10(root=data_dir,
                                    train=True,

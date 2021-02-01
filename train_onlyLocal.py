@@ -138,16 +138,16 @@ def main():
         drop_last=True)
 
     # Create models
-    decoder, encoder, discriminator, label_generator, _, qhead_discriminator = build_models(config)
+    decoder, encoder, discriminator, label_generator, qhead_discriminator = build_models(config)
 
     # Put models on gpu if needed
     decoder = decoder.to(device)
     encoder = encoder.to(device)
     discriminator = discriminator.to(device)
     label_generator = label_generator.to(device)
-    if qhead_discriminator!=None:
-        print("USING QHEAD DISCRIMINATOR")
-        qhead_discriminator = qhead_discriminator.to(device)
+
+    print("USING QHEAD DISCRIMINATOR")
+    qhead_discriminator = qhead_discriminator.to(device)
 
     for name, module in encoder.named_modules():
         if isinstance(module, nn.Sigmoid):
@@ -160,31 +160,20 @@ def main():
     encoder = nn.DataParallel(encoder, device_ids=devices)
     discriminator = nn.DataParallel(discriminator, device_ids=devices)
     label_generator = nn.DataParallel(label_generator, device_ids=devices)
-    if qhead_discriminator!=None:
-        qhead_discriminator = nn.DataParallel(qhead_discriminator, device_ids=devices)
+    qhead_discriminator = nn.DataParallel(qhead_discriminator, device_ids=devices)
 
-        # Register modules to checkpoint
-        checkpoint_io.register_modules(decoder=decoder,
-                                       encoder=encoder,
-                                       label_generator = label_generator,
+    # Register modules to checkpoint
+    checkpoint_io.register_modules(decoder=decoder,
+                                   encoder=encoder,
+                                   label_generator = label_generator,
 
-                                       discriminator= discriminator,
-                                       qhead_discriminator=qhead_discriminator,
-                                       disc_optimizer=disc_optimizer,
-                                       enc_optimizer=enc_optimizer,
-                                       dec_optimizer=dec_optimizer,
-                                       label_gen_optimizer = label_gen_optimizer
-                                       )
-    else:
-        checkpoint_io.register_modules(decoder=decoder,
-                                       encoder=encoder,
-                                       label_generator=label_generator,
-                                       discriminator=discriminator,
-                                       disc_optimizer=disc_optimizer,
-                                       enc_optimizer=enc_optimizer,
-                                       dec_optimizer=dec_optimizer,
-                                       label_gen_optimizer=label_gen_optimizer
-                                       )
+                                   discriminator= discriminator,
+                                   qhead_discriminator=qhead_discriminator,
+                                   disc_optimizer=disc_optimizer,
+                                   enc_optimizer=enc_optimizer,
+                                   dec_optimizer=dec_optimizer,
+                                   label_gen_optimizer = label_gen_optimizer
+                                   )
 
 
     # Logger
@@ -231,8 +220,7 @@ def main():
     encoder.apply(init_weights)
     discriminator.apply(init_weights)
     label_generator.apply(init_weights)
-    if qhead_discriminator!=None:
-        qhead_discriminator.apply(init_weights)
+    qhead_discriminator.apply(init_weights)
 
     # Load checkpoint if it exists
     it = utils.get_most_recent(checkpoint_dir, 'model') if args.model_it == -1 else args.model_it
@@ -291,7 +279,7 @@ def main():
                 print(dloss)
 
             # (i) Sample if necessary
-            if it % config['training']['sample_every'] == 0 or True:
+            if it % config['training']['sample_every'] == 0:
                 print("it", it)
                 print('Creating samples...')
 
@@ -300,7 +288,7 @@ def main():
 
                 z_lab = zdist_lab.sample((ntest,))
                 x = evaluator.create_samples_labelGen(z_test, z_lab)
-                logger.add_imgs(x, 'all', it+50)
+                logger.add_imgs(x, 'all', it+1)
 
 
             # (ii) Compute inception if necessary

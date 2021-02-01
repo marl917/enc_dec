@@ -26,19 +26,12 @@ class Decoder(nn.Module):
         self.deterministicOnSeg = deterministicOnSeg
         print("Decoder only depends on Segmentation : ", self.deterministicOnSeg)
 
-        # if conditioning == 'embedding':
-        #     self.get_latent = blocks.LatentEmbeddingConcat(nlabels, embed_dim)
-        #     self.fc = nn.Linear(z_dim + embed_dim, self.sh * self.sw * ngf * 8)
-        # elif conditioning == 'unconditional':
         self.get_latent = blocks.Identity()
         if self.deterministicOnSeg:
             self.fc = nn.Conv2d(local_nlabels,ngf * 8, 3, padding=1)
         else:
             self.fc = nn.Linear(z_dim, self.sh * self.sw * ngf * 8)
-        # else:
-        #     raise NotImplementedError(
-        #         f"{conditioning} not implemented for generator")
-        # print("in decoder : ", local_nlabels)
+
         self.up = nn.Upsample(scale_factor=2)
         self.head_0 = blocks.SPADEResnetBlock(8 * ngf, 8 * ngf, local_nlabels)
         self.G_middle_0 = blocks.SPADEResnetBlock(8 * ngf, 8 * ngf,local_nlabels)
@@ -48,7 +41,6 @@ class Decoder(nn.Module):
         self.up_3 = blocks.SPADEResnetBlock(2 * ngf, 1 * ngf, local_nlabels)
         self.conv_img = nn.Conv2d(ngf, 3, 3, padding=1)
 
-        self.global_nlabels = nlabels
 
     def forward(self,  seg, input=None, y=None):  #input=z
         #alternative : downsample label map
@@ -107,6 +99,7 @@ class Encoder(nn.Module):
                                                                 n_channels=ndf * 4)  # modified : remove dilatation
         self.logSoftmax = nn.LogSoftmax(dim=1)
 
+
         self.features = features
         self.pack_size = pack_size
         print(f'Getting features from {self.features}')
@@ -153,7 +146,8 @@ class BiGANDiscriminator(nn.Module):
                  img_path=False,
                  nc=3,
                  ndf=64,
-                 size=0,
+                 img_size=0,
+                 label_size=0,
                  **kwargs):
         super(BiGANDiscriminator, self).__init__()
         # print("USING BiGAN Discriminator", "qhead disc only with img network :", qhead_withImg)
@@ -164,11 +158,11 @@ class BiGANDiscriminator(nn.Module):
         self.qhead_withImg = qhead_withImg
         self.img_path = img_path
 
-        input_nc = 3
-        self.final_res = size // (2 ** 3)  # if conv5 and conv6 are added
+
+        # self.final_res = img_size // (2 ** 3)  # if conv5 and conv6 are added
 
         #inference over img
-        self.conv1 = nn.Sequential(nn.Conv2d(input_nc * pack_size, ndf, 3, 1, 1),
+        self.conv1 = nn.Sequential(nn.Conv2d(3 * pack_size, ndf, 3, 1, 1),
                                    nn.BatchNorm2d(ndf),
                                    nn.LeakyReLU(0.2, inplace=True))
 

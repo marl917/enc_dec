@@ -93,13 +93,13 @@ class ResnetBlock(nn.Module):
                  fin,
                  fout,
                  bn,
-                 nclasses,
+                 use_shortcut=False,
                  fhidden=None,
                  is_bias=True):
         super().__init__()
         # Attributes
         self.is_bias = is_bias
-        self.learned_shortcut = (fin != fout)
+        self.learned_shortcut = (fin != fout) or use_shortcut
         self.fin = fin
         self.fout = fout
         if fhidden is None:
@@ -121,15 +121,15 @@ class ResnetBlock(nn.Module):
                           stride=1,
                           padding=0,
                           bias=False)
-        self.bn0 = bn(self.fin, nclasses)
-        self.bn1 = bn(self.fhidden, nclasses)
+        self.bn0 = bn(self.fin)
+        self.bn1 = bn(self.fhidden)
 
-    def forward(self, x, y):
+    def forward(self, x):
         x_s = self._shortcut(x)
-        dx = self.conv_0(actvn(self.bn0(x, y)))
-        dx = self.conv_1(actvn(self.bn1(dx, y)))
-        out = x_s + 0.1 * dx
-
+        dx = self.conv_0(actvn(self.bn0(x)))
+        dx = self.conv_1(actvn(self.bn1(dx)))
+        # out = x_s + 0.1 * dx
+        out = x_s + 0.9*dx
         return out
 
     def _shortcut(self, x):
@@ -181,23 +181,41 @@ class Identity(nn.Module):
         return inp
 
 
+# class Classifier_Module(nn.Module):
+#
+#     def __init__(self, num_classes, n_channels, dilation_series=[6,12,18,24], padding_series=[6,12,18,24]):
+#         super(Classifier_Module, self).__init__()
+#         self.conv2d_list = nn.ModuleList()
+#         for dilation, padding in zip(dilation_series, padding_series):
+#             self.conv2d_list.append(nn.Conv2d(n_channels, num_classes, kernel_size=3, stride=1, padding=padding, dilation=dilation, bias = True))
+#
+#         for m in self.conv2d_list:
+#             m.weight.data.normal_(0, 0.01)
+#
+#     def forward(self, x):
+#         out = self.conv2d_list[0](x)
+#         for i in range(len(self.conv2d_list)-1):
+#             out += self.conv2d_list[i+1](x)
+#         return out
+
+
 class Classifier_Module(nn.Module):
 
-    def __init__(self, num_classes, n_channels, dilation_series=[6,12,18,24], padding_series=[6,12,18,24]):
+    def __init__(self, dilation_series, padding_series, num_classes, n_input_channels):
         super(Classifier_Module, self).__init__()
         self.conv2d_list = nn.ModuleList()
         for dilation, padding in zip(dilation_series, padding_series):
-            self.conv2d_list.append(nn.Conv2d(n_channels, num_classes, kernel_size=3, stride=1, padding=padding, dilation=dilation, bias = True))
+            self.conv2d_list.append(nn.Conv2d(
+                n_input_channels, num_classes, kernel_size=3, stride=1, padding=padding, dilation=dilation, bias=True))
 
         for m in self.conv2d_list:
             m.weight.data.normal_(0, 0.01)
 
     def forward(self, x):
         out = self.conv2d_list[0](x)
-        for i in range(len(self.conv2d_list)-1):
-            out += self.conv2d_list[i+1](x)
+        for i in range(len(self.conv2d_list) - 1):
+            out += self.conv2d_list[i + 1](x)
         return out
-
 
 class local_FeatureMapping(nn.Module):
 
@@ -318,9 +336,9 @@ class ConditionalBatchNorm2d(nn.Module):
 class BatchNorm2d(nn.Module):
     ''' identical to nn.BatchNorm2d but takes in y input that is ignored '''
 
-    def __init__(self, nc, nchannels, **kwargs):
+    def __init__(self, nc, nchannels=None, **kwargs):
         super().__init__()
         self.bn = nn.BatchNorm2d(nc)
 
-    def forward(self, x, y):
+    def forward(self, x, y=None):
         return self.bn(x)

@@ -79,6 +79,8 @@ class Trainer(object):
         # first part : train label generator and img decoder
         seg_fake_unorm, seg_fake = self.label_generator(z_lab)
         x_fake = self.decoder(seg = seg_fake, input = z)  #seg fake detach
+        # print("x_fake max min", x_fake.size(), seg_fake.size())
+        # print("x_real max min : ", torch.min(x_real), torch.max(x_real))
         g_fake = self.discriminator(x_fake,  seg=seg_fake)
 
         con_loss = torch.tensor(0., device='cuda')
@@ -86,7 +88,9 @@ class Trainer(object):
             mu, var = self.qhead_discriminator(g_fake[0])
             con_loss = self.normalNLLLoss(z_lab,mu,var) * 0.1
         #second part : train encoder
+
         label_map_real_unorm, label_map_real= self.encoder(x_real)
+        # print("encoder : ", label_map_real.size())
         g_real_enc = self.discriminator(x_real, seg=label_map_real)
 
         if len(g_fake)>2:

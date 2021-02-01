@@ -16,16 +16,9 @@ encoder:
   kwargs:
     placeholder: None
 label_generator:
-  name: dcgan_label_gen
-  zdim: 50
-  kwargs:
-    placeholder: None
-label_discriminator:
   label_size: 8
   name: dcgan_label_gen
-  nlabels: 1
-  n_locallabels: 50
-  conditioning: unconditional
+  zdim: 50
   kwargs:
     placeholder: None
 z_dist:

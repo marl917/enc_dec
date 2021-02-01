@@ -15,7 +15,7 @@ class Generator(nn.Module):
                  local_nlabels=0,
                  ngf=64,
                  embed_dim=256,
-                 size=0,
+                 label_size=0,
                  **kwargs):
         super(Generator, self).__init__()
         size = 8
