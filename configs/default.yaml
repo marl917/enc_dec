@@ -35,7 +35,7 @@ training:
   reg_param: 10.
   log_every: 1
   batch_size: 128
-  ntest: 50
+  ntest: 64
   nworkers: 8
   burnin_time: 0
   take_model_average: true

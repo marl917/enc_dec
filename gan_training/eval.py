@@ -90,12 +90,15 @@ class Evaluator(object):
         with torch.no_grad():
             _,label_map = self.label_generator(z_lab)
             print("generator labels : ", torch.argmax(label_map, dim=1)[:3])
-            x_fake = self.decoder(seg = label_map, input=z)
+            x_fake1 = self.decoder(seg = label_map, input=z)
+
+            z_Bis = self.sample_z(z.size(0))
+            x_fake2 = self.decoder(seg = label_map, input = z_Bis)
             # print('range in labelGen sample', torch.min(x_fake), torch.max(x_fake), x_fake.size())
             # z_fake = torch.randn(50, 256, 1, 1, device = 'cuda')
             # x_fake = self.decoder(z_fake)
 
-        return x_fake
+        return torch.cat((x_fake1, x_fake2), dim=0)
 
     def create_samples(self, x_real,z):
         self.decoder.eval()

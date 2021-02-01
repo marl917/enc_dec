@@ -57,6 +57,7 @@ class Decoder(nn.Module):
             out = self.fc(out)
         else:
             out = self.get_latent(input, y)
+            # print("out size in decoder : ", out.size())
             out = self.fc(out)
             out = out.view(out.size(0), -1, self.sh, self.sw)
         x = self.head_0(out, seg)
@@ -194,7 +195,7 @@ class BiGANDiscriminator(nn.Module):
             self.conv7 = nn.Sequential(nn.Conv2d(ndf * 8, ndf * 8, 4, 2, 1),
                                        nn.BatchNorm2d(ndf * 8),
                                        nn.LeakyReLU(0.2, inplace=True))
-            self.fc_out_img = nn.Sequential(nn.Conv2d(ndf * 8, 1, 1, stride=1, bias=False), nn.LeakyReLU(0.2, inplace=True))
+            self.fc_out_img = blocks.LinearUnconditionalLogits(ndf * 8*4*4) #nn.Sequential(nn.Conv2d(ndf * 8, 1, 1, stride=1, bias=False), nn.LeakyReLU(0.2, inplace=True))
 
 
         #inference over seg
@@ -206,7 +207,8 @@ class BiGANDiscriminator(nn.Module):
         self.conv2xz = nn.Sequential(nn.Conv2d(ndf * 8, ndf * 8, 1, stride=1, bias=False), nn.LeakyReLU(0.2, inplace=True))
         self.conv3xz = nn.Sequential(nn.Conv2d(ndf * 8, 1, 1, stride=1, bias=False), nn.LeakyReLU(0.2, inplace=True))
         #comment fc_out_joint to ouput a map of 8x8 to compute bin crossentropy on that :
-        # self.fc_out_joint = blocks.LinearUnconditionalLogits(8*8)
+        self.fc_out_joint = blocks.LinearUnconditionalLogits(8*8)
+        # self.conv4xz = nn.Sequential(nn.Conv2d(1, 1, 4, 2,1, bias=False), nn.LeakyReLU(0.2, inplace=True))
 
     def inf_x(self, img):
         out = self.conv1(img)   #to try : with dropout as in initial bigan model
@@ -225,8 +227,9 @@ class BiGANDiscriminator(nn.Module):
         out = self.conv1xz(xseg)
         forQdisc = self.conv2xz(out)
         out = self.conv3xz(forQdisc)
-        # out = out.view(out.size(0), -1)
-        # out = self.fc_out_joint(out)
+        out = out.view(out.size(0), -1)
+        out = self.fc_out_joint(out)
+        # out = self.conv4xz(out)
         return forQdisc, out
 
 
@@ -247,8 +250,9 @@ class BiGANDiscriminator(nn.Module):
         else:
             input = self.conv6(inputbis)
             input = self.conv7(input)
+            input = input.view(input.size(0),-1)
             input = self.fc_out_img(input)
-            # print("img path", input.size())
+            # print("img path", input.size(), xseg.size())
             return forQdisc, xseg, input
 
 
