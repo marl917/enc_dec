@@ -78,140 +78,61 @@ class Decoder(nn.Module):
         x = torch.tanh(x)
         return x
 
-# class Encoder(nn.Module):
-#     def __init__(self,
-#                  nlabels,
-#                  local_nlabels,
-#                  img_size,
-#                  nfilter=64,
-#                  features='penultimate',
-#                  **kwargs):
-#         super(Encoder, self).__init__()
-#         s0 = self.s0 = img_size // 32
-#         print("img size in encoder :", img_size)
-#         nf = self.nf = nfilter
-#         self.nlabels = nlabels
-#         self.local_nlabels = local_nlabels
-#
-#
-#         bn = blocks.Identity
-#
-#         self.conv_img = nn.Conv2d(3, 1 * nf, 3, padding=1)
-#
-#         self.resnet_0_0 = ResnetBlock(1 * nf, 1 * nf, bn)
-#         self.resnet_0_1 = ResnetBlock(1 * nf, 2 * nf, bn)
-#
-#         self.resnet_1_0 = ResnetBlock(2 * nf, 2 * nf, bn)
-#         self.resnet_1_1 = ResnetBlock(2 * nf, 4 * nf, bn)
-#
-#         self.resnet_2_0 = ResnetBlock(4 * nf, 4 * nf, bn)
-#         self.resnet_2_1 = ResnetBlock(4 * nf, 8 * nf, bn)
-#
-#         self.resnet_3_0 = ResnetBlock(8 * nf, 8 * nf, bn)
-#         self.resnet_3_1 = ResnetBlock(8 * nf, 16 * nf, bn)
-#
-#         self.resnet_4_0 = ResnetBlock(16 * nf, 16 * nf, bn)
-#         self.resnet_4_1 = ResnetBlock(16 * nf, 16 * nf, bn)
-#         #
-#         # self.resnet_5_0 = ResnetBlock(16 * nf, 16 * nf, bn, nlabels)
-#         # self.resnet_5_1 = ResnetBlock(16 * nf, 16 * nf, bn, nlabels)
-#
-#         # self.local_FeatureMapping = blocks.Classifier_Module(dilation_series = [3,6,9,12], padding_series = [3,6,9,12], num_classes=self.local_nlabels,
-#         #                                                         n_input_channels=nf * 16)  # modified : remove dilatation
-#
-#         self.local_FeatureMapping = blocks.local_FeatureMapping(num_classes=self.local_nlabels, n_channels=16*nf)
-#
-#         self.logSoftmax = nn.LogSoftmax(dim=1)
-#         self.FloatTensor = torch.cuda.FloatTensor
-#
-#     def sample_gumbel(self, shape, logits, eps=1e-20):
-#         U = logits.new(shape).uniform_(0, 1)  # = torch.rand(shape).cuda()
-#         return -Variable(torch.log(-torch.log(U + eps) + eps))
-#
-#     def gumbel_softmax_sample(self, logits, temperature):
-#         y = logits + self.sample_gumbel(logits.size(), logits)
-#         return F.softmax(y / temperature, dim=1), y
-#
-#     def gumble_softmax(self, logits):
-#         y, y_unorm = self.gumbel_softmax_sample(logits, temperature=1.0)
-#         x = torch.argmax(y, dim=1)
-#         x = torch.unsqueeze(x, dim=1)
-#         bs, _, h, w = x.size()
-#         # print("local n labels  : ", self.local_nlabels, torch.min(x), torch.max(x))
-#         input_label = self.FloatTensor(bs, self.local_nlabels, h, w).zero_()
-#         y_hard = input_label.scatter_(1, x.long().cuda(), 1.0)
-#         return (y_hard - y).detach() + y, y_unorm
-#
-#     def forward(self, x):
-#         out = self.conv_img(x)
-#
-#         out = self.resnet_0_0(out)
-#         out = self.resnet_0_1(out)
-#         out = F.avg_pool2d(out, 3, stride=2, padding=1)
-#         out = self.resnet_1_0(out)
-#         out = self.resnet_1_1(out)
-#
-#         out = self.resnet_2_0(out)
-#         out = self.resnet_2_1(out)
-#         out = F.avg_pool2d(out, 3, stride=2, padding=1)
-#         out = self.resnet_3_0(out)
-#         out = self.resnet_3_1(out)
-#         #if there is 8x8 label map:
-#         out = F.avg_pool2d(out, 3, stride=2, padding=1)
-#
-#         out = self.resnet_4_0(out)
-#         out = self.resnet_4_1(out)
-#         out = actvn(out)
-#         out = self.local_FeatureMapping(out)
-#
-#         logits = self.logSoftmax(out)
-#         label_map, label_map_unorm = self.gumble_softmax(logits)
-#
-#         return label_map_unorm, label_map
-
-
 class Encoder(nn.Module):
     def __init__(self,
                  nlabels,
-                 local_nlabels=None,
-                 nc=3,
-                 ndf=64,
-                 pack_size=1,
+                 local_nlabels,
+                 img_size,
+                 label_size =0,
+                 nfilter=64,
                  features='penultimate',
                  **kwargs):
-
         super(Encoder, self).__init__()
-
-        #assert conditioning != 'unconditional' or nlabels == 1
-
-        self.FloatTensor = torch.cuda.FloatTensor if True \
-            else torch.FloatTensor  #is_cuda
-
+        # s0 = self.s0 = img_size // 32
+        print("img size in encoder :", img_size)
+        nf = self.nf = nfilter
+        self.nlabels = nlabels
         self.local_nlabels = local_nlabels
+        self.img_size =img_size
+        self.label_size = label_size
 
 
-        self.conv1 = nn.Sequential(nn.Conv2d(nc * pack_size, ndf, 3, 1, 1), nn.LeakyReLU(0.1))
-        self.conv2 = nn.Sequential(nn.Conv2d(ndf, ndf, 4, 2, 1), nn.LeakyReLU(0.1))
-        self.conv3 = nn.Sequential(nn.Conv2d(ndf, ndf * 2, 3, 1, 1), nn.LeakyReLU(0.1))
-        self.conv4 = nn.Sequential(nn.Conv2d(ndf * 2, ndf * 2, 4, 2, 1), nn.LeakyReLU(0.1))
-        self.conv5 = nn.Sequential(nn.Conv2d(ndf * 2, ndf * 4, 4, 2, 1), nn.LeakyReLU(0.1))
+        bn = blocks.Identity
 
+        self.conv_img = nn.Conv2d(3, 1 * nf, 3, padding=1)
 
-        self.local_FeatureMapping = blocks.local_FeatureMapping(num_classes=self.local_nlabels,
-                                                                n_channels=ndf * 4)  # modified : remove dilatation
+        self.resnet_0_0 = ResnetBlock(1 * nf, 1 * nf, bn)
+        self.resnet_0_1 = ResnetBlock(1 * nf, 2 * nf, bn)
+
+        self.resnet_1_0 = ResnetBlock(2 * nf, 2 * nf, bn)
+        self.resnet_1_1 = ResnetBlock(2 * nf, 4 * nf, bn)
+
+        self.resnet_2_0 = ResnetBlock(4 * nf, 4 * nf, bn)
+        self.resnet_2_1 = ResnetBlock(4 * nf, 8 * nf, bn)
+
+        self.resnet_3_0 = ResnetBlock(8 * nf, 8 * nf, bn)
+        self.resnet_3_1 = ResnetBlock(8 * nf, 16 * nf, bn)
+
+        self.resnet_4_0 = ResnetBlock(16 * nf, 16 * nf, bn)
+        self.resnet_4_1 = ResnetBlock(16 * nf, 16 * nf, bn)
+        #
+        # self.resnet_5_0 = ResnetBlock(16 * nf, 16 * nf, bn, nlabels)
+        # self.resnet_5_1 = ResnetBlock(16 * nf, 16 * nf, bn, nlabels)
+
+        # self.local_FeatureMapping = blocks.Classifier_Module(dilation_series = [3,6,9,12], padding_series = [3,6,9,12], num_classes=self.local_nlabels,
+        #                                                         n_input_channels=nf * 16)  # modified : remove dilatation
+
+        self.local_FeatureMapping = blocks.local_FeatureMapping(num_classes=self.local_nlabels, n_channels=16*nf)
+
         self.logSoftmax = nn.LogSoftmax(dim=1)
+        self.FloatTensor = torch.cuda.FloatTensor
 
-
-        self.features = features
-        self.pack_size = pack_size
-        print(f'Getting features from {self.features}')
-
-    def sample_gumbel(self, shape, eps=1e-20):
-        U = torch.rand(shape).cuda()
+    def sample_gumbel(self, shape, logits, eps=1e-20):
+        U = logits.new(shape).uniform_(0, 1)  # = torch.rand(shape).cuda()
         return -Variable(torch.log(-torch.log(U + eps) + eps))
 
     def gumbel_softmax_sample(self, logits, temperature):
-        y = logits + self.sample_gumbel(logits.size())
+        y = logits + self.sample_gumbel(logits.size(), logits)
         return F.softmax(y / temperature, dim=1), y
 
     def gumble_softmax(self, logits):
@@ -219,61 +140,75 @@ class Encoder(nn.Module):
         x = torch.argmax(y, dim=1)
         x = torch.unsqueeze(x, dim=1)
         bs, _, h, w = x.size()
+        # print("local n labels  : ", self.local_nlabels, torch.min(x), torch.max(x))
         input_label = self.FloatTensor(bs, self.local_nlabels, h, w).zero_()
         y_hard = input_label.scatter_(1, x.long().cuda(), 1.0)
         return (y_hard - y).detach() + y, y_unorm
 
+    def forward(self, x):
+        out = self.conv_img(x)
 
-    def forward(self, input):
-        out = self.conv1(input)
-        out = self.conv2(out)
-        out = self.conv3(out)
-        out = self.conv4(out)
-        out = self.conv5(out)  #out of size bs * 256 * 8 * 8
-        out = self.local_FeatureMapping(out)#local classifier for discriminator loss : map the features to K_2 classifiers : size K_2 * 8 * 8 label map
+        out = self.resnet_0_0(out)
+        out = self.resnet_0_1(out)
+        out = F.avg_pool2d(out, 3, stride=2, padding=1)
+        out = self.resnet_1_0(out)
+        out = self.resnet_1_1(out)
 
+        out = self.resnet_2_0(out)
+        out = self.resnet_2_1(out)
+        out = F.avg_pool2d(out, 3, stride=2, padding=1)
+        out = self.resnet_3_0(out)
+        out = self.resnet_3_1(out)
+
+        #if there is 8x8 label map:
+        if self.img_size // self.label_size == 8:
+            out = F.avg_pool2d(out, 3, stride=2, padding=1)
+
+        out = self.resnet_4_0(out)
+        out = self.resnet_4_1(out)
+        out = actvn(out)
+        out = self.local_FeatureMapping(out)
 
         logits = self.logSoftmax(out)
         label_map, label_map_unorm = self.gumble_softmax(logits)
 
         return label_map_unorm, label_map
 
-# class LabelGenerator(nn.Module):
+
+# class Encoder(nn.Module):
 #     def __init__(self,
-#                  z_dim,
 #                  nlabels,
-#                  label_size,
-#                  local_nlabels=0,
-#                  conditioning=None,
-#                  nfilter=64,
+#                  local_nlabels=None,
+#                  nc=3,
+#                  ndf=64,
+#                  pack_size=1,
+#                  features='penultimate',
 #                  **kwargs):
-#         super().__init__()
-#         s0 = self.s0 = label_size // 4
-#         nf = self.nf = nfilter
-#         self.nlabels = nlabels
-#         self.z_dim = z_dim
+#
+#         super(Encoder, self).__init__()
+#
+#         #assert conditioning != 'unconditional' or nlabels == 1
+#
+#         self.FloatTensor = torch.cuda.FloatTensor if True \
+#             else torch.FloatTensor  #is_cuda
+#
 #         self.local_nlabels = local_nlabels
 #
-#         # self.fc = nn.Linear(z_dim, 16 * nf * s0 * s0)
-#         self.fc = nn.Linear(z_dim, 8 * nf * s0 * s0)
-#
-#         #either use conditional batch norm, or use no batch norm
-#         # bn = blocks.Identity
-#         bn = blocks.BatchNorm2d
-#         self.resnet_0_0 = ResnetBlock(8 * nf, 8 * nf, bn)
-#
-#         self.resnet_1_0 = ResnetBlock(8 * nf, 4 * nf, bn)
-#
-#         self.resnet_2_0 = ResnetBlock(4 * nf, 4 * nf, bn)
-#
-#         self.resnet_4_0 = ResnetBlock(4 * nf, 2 * nf, bn)
-#
-#         self.resnet_5_0 = ResnetBlock(2 * nf, 1 * nf, bn)
+#         self.conv1 = nn.Sequential(nn.Conv2d(nc * pack_size, ndf, 3, 1, 1), nn.LeakyReLU(0.1))
+#         self.conv2 = nn.Sequential(nn.Conv2d(ndf, ndf, 4, 2, 1), nn.LeakyReLU(0.1))
+#         self.conv3 = nn.Sequential(nn.Conv2d(ndf, ndf * 2, 3, 1, 1), nn.LeakyReLU(0.1))
+#         self.conv4 = nn.Sequential(nn.Conv2d(ndf * 2, ndf * 2, 4, 2, 1), nn.LeakyReLU(0.1))
+#         self.conv5 = nn.Sequential(nn.Conv2d(ndf * 2, ndf * 4, 4, 2, 1), nn.LeakyReLU(0.1))
 #
 #
-#         self.conv_img = nn.Sequential(nn.Conv2d(nf , self.local_nlabels, 3, padding = 1), nn.LogSoftmax(dim=1))
+#         self.local_FeatureMapping = blocks.local_FeatureMapping(num_classes=self.local_nlabels,
+#                                                                 n_channels=ndf * 4)  # modified : remove dilatation
+#         self.logSoftmax = nn.LogSoftmax(dim=1)
 #
-#         self.FloatTensor = torch.cuda.FloatTensor
+#
+#         self.features = features
+#         self.pack_size = pack_size
+#         print(f'Getting features from {self.features}')
 #
 #     def sample_gumbel(self, shape, eps=1e-20):
 #         U = torch.rand(shape).cuda()
@@ -284,7 +219,7 @@ class Encoder(nn.Module):
 #         return F.softmax(y / temperature, dim=1), y
 #
 #     def gumble_softmax(self, logits):
-#         y, y_unorm= self.gumbel_softmax_sample(logits, temperature=1.0)
+#         y, y_unorm = self.gumbel_softmax_sample(logits, temperature=1.0)
 #         x = torch.argmax(y, dim=1)
 #         x = torch.unsqueeze(x, dim=1)
 #         bs, _, h, w = x.size()
@@ -292,84 +227,58 @@ class Encoder(nn.Module):
 #         y_hard = input_label.scatter_(1, x.long().cuda(), 1.0)
 #         return (y_hard - y).detach() + y, y_unorm
 #
-#     def forward(self, z):
+#
+#     def forward(self, input):
+#         out = self.conv1(input)
+#         out = self.conv2(out)
+#         out = self.conv3(out)
+#         out = self.conv4(out)
+#         out = self.conv5(out)  #out of size bs * 256 * 8 * 8
+#         out = self.local_FeatureMapping(out)#local classifier for discriminator loss : map the features to K_2 classifiers : size K_2 * 8 * 8 label map
 #
 #
-#         out = self.fc(z)
+#         logits = self.logSoftmax(out)
+#         label_map, label_map_unorm = self.gumble_softmax(logits)
 #
-#         out = out.view(z.size(0), 8 * self.nf, self.s0, self.s0)
-#
-#         out = self.resnet_0_0(out)
-#         out = self.resnet_1_0(out)
-#
-#         out = F.interpolate(out, scale_factor=2)
-#         out = self.resnet_2_0(out)
-#
-#
-#
-#
-#
-#         out = self.resnet_4_0(out)
-#         out = F.interpolate(out, scale_factor=2)
-#
-#         out = self.resnet_5_0(out)
-#
-#         logits = self.conv_img(actvn(out))
-#
-#         label_map, y_unorm = self.gumble_softmax(logits)
-#
-#         return label_map, y_unorm
+#         return label_map_unorm, label_map
 
 class LabelGenerator(nn.Module):
     def __init__(self,
+                 z_dim,
                  nlabels,
-                 conditioning,
-                 z_dim=128,
+                 label_size,
                  local_nlabels=0,
-                 ngf=64,
-                 embed_dim=256,
-                 label_size=0,
+                 conditioning=None,
+                 nfilter=64,
                  **kwargs):
         super(LabelGenerator, self).__init__()
-        size = 8
-        assert conditioning != 'unconditional' or nlabels == 1
-        self.sw = size // (2 ** 2)
-        self.sh = self.sw
-
-        nc= local_nlabels
-
-        if conditioning == 'embedding':
-            self.get_latent = blocks.LatentEmbeddingConcat(nlabels, embed_dim)
-            self.fc = nn.Linear(z_dim + embed_dim, self.sh*self.sw * ngf * 8)
-        elif conditioning == 'unconditional':
-            self.get_latent = blocks.Identity()
-            self.fc = nn.Linear(z_dim, self.sh*self.sw * ngf * 8)
-        else:
-            raise NotImplementedError(
-                f"{conditioning} not implemented for generator")
-
-        bn = blocks.BatchNorm2d
-
+        s0 = self.s0 = label_size // 4
+        print(label_size)
+        nf = self.nf = nfilter
         self.nlabels = nlabels
+        self.z_dim = z_dim
         self.local_nlabels = local_nlabels
 
-        self.conv1 = nn.ConvTranspose2d(ngf * 8, ngf * 8, 4, 2, 1)
-        self.bn1 = bn(ngf * 8, nlabels)
+        self.fc = nn.Linear(z_dim, 8 * nf * s0 * s0)
 
-        self.conv1bis = nn.ConvTranspose2d(ngf * 8, ngf * 4, 3, 1, 1)
-        self.bn1bis = bn(ngf * 4, nlabels)
+        #either use conditional batch norm, or use no batch norm
+        # bn = blocks.Identity
+        # bn = blocks.BatchNorm2d
 
-        self.conv2 = nn.ConvTranspose2d(ngf * 4, ngf * 4, 4, 2, 1)
-        self.bn2 = bn(ngf * 4, nlabels)
+        bn = spectral_norm
+        self.resnet_0_0 = ResnetBlock(8 * nf, 8 * nf, bn)
 
-        self.conv2bis = nn.ConvTranspose2d(ngf * 4, ngf * 2, 3, 1, 1)
-        self.bn2bis = bn(ngf * 2, nlabels)
+        self.resnet_1_0 = ResnetBlock(8 * nf, 4 * nf, bn)
 
+        self.resnet_2_0 = ResnetBlock(4 * nf, 4 * nf, bn)
 
-        self.conv_out = nn.Sequential(nn.Conv2d(ngf*2, nc, 3, 1, 1), nn.LogSoftmax(dim=1))
+        self.resnet_4_0 = ResnetBlock(4 * nf, 2 * nf, bn)
 
-        self.FloatTensor = torch.cuda.FloatTensor if True \
-            else torch.FloatTensor  # is_cuda
+        self.resnet_5_0 = ResnetBlock(2 * nf, 1 * nf, bn)
+
+        self.conv_img = nn.Sequential(nn.Conv2d(nf, self.local_nlabels, 3, padding = 1), nn.LogSoftmax(dim=1))
+
+        self.FloatTensor = torch.cuda.FloatTensor
 
     def sample_gumbel(self, shape, eps=1e-20):
         U = torch.rand(shape).cuda()
@@ -388,230 +297,248 @@ class LabelGenerator(nn.Module):
         y_hard = input_label.scatter_(1, x.long().cuda(), 1.0)
         return (y_hard - y).detach() + y, y_unorm
 
-    def forward(self, input, y=None):
-        out = self.get_latent(input, y)
-        out = self.fc(out)
+    def forward(self, z):
+        out = self.fc(z)
+        out = out.view(z.size(0), 8 * self.nf, self.s0, self.s0)
+        out = self.resnet_0_0(out)
+        out = self.resnet_1_0(out)
+        out = F.interpolate(out, scale_factor=2)
+        out = self.resnet_2_0(out)
+        out = self.resnet_4_0(out)
+        out = F.interpolate(out, scale_factor=2)
+        out = actvn(self.resnet_5_0(out))
 
-        out = out.view(out.size(0), -1, self.sh, self.sw)
-        out = F.relu(self.bn1(self.conv1(out), y))
-        out = F.relu(self.bn1bis(self.conv1bis(out), y))
-        out = F.relu(self.bn2(self.conv2(out), y))
-        out = F.relu(self.bn2bis(self.conv2bis(out), y))
-        logits = self.conv_out(out)
+        logits = self.conv_img(out)
         label_map, y_unorm = self.gumble_softmax(logits)
+
         return y_unorm, label_map
-
-
-#
-# class BiGANDiscriminator(nn.Module):
-#     def __init__(self,
-#                  nlabels,
-#                  local_nlabels,
-#                  img_size,
-#                  label_size,
-#                  nfilter=64,
-#                  **kwargs):
-#         super().__init__()
-#         s0 = self.s0 = label_size //2
-#         print("value of s0 in BiGAN DISC : ", s0)
-#         nf = self.nf = nfilter
-#         self.nlabels = nlabels
-#         self.local_nlabels = local_nlabels
-#
-#         bn = blocks.Identity
-#
-#         #inference over x
-#         self.conv_img = nn.Conv2d(3, 1 * nf, 3, padding=1)
-#
-#         self.resnet_0_0_img = ResnetBlock(1 * nf, 1 * nf, bn)
-#         self.resnet_0_1_img = ResnetBlock(1 * nf, 2 * nf, bn)
-#
-#         self.resnet_1_0_img = ResnetBlock(2 * nf, 2 * nf, bn)
-#         self.resnet_1_1_img = ResnetBlock(2 * nf, 4 * nf, bn)
-#
-#         self.resnet_2_0_img = ResnetBlock(4 * nf, 4 * nf, bn)
-#         self.resnet_2_1_img = ResnetBlock(4 * nf, 8 * nf, bn)
-#
-#
-#
-#         #inference over seg
-#         self.conv1z = nn.Sequential(nn.Conv2d(self.local_nlabels, ndf * 4, 1, 1, padding=0, bias=False),
-#                                     nn.LeakyReLU(0.2, inplace=True))
-#         self.conv2z = nn.Sequential(nn.Conv2d(ndf * 4, ndf * 8, 1, 1, padding=0, bias=False),
-#                                     nn.LeakyReLU(0.2, inplace=True))
-#
-#         # self.resnet_3_0_seg = ResnetBlock(self.local_nlabels, 2 * nf, bn)
-#         # self.resnet_3_1_seg = ResnetBlock(2 * nf, 8 * nf, bn)
-#         # self.resnet_3_2_seg = ResnetBlock(2 * nf, 4 * nf, bn)
-#         # self.resnet_3_3_seg = ResnetBlock(4 * nf, 8 * nf, bn)
-#
-#         #joint inference
-#         self.resnet_4_0 = ResnetBlock(16 * nf, 16 * nf, bn, use_shortcut=True, is_bias=False)
-#         self.resnet_4_1 = ResnetBlock(16 * nf, 16 * nf, bn, use_shortcut=True, is_bias=False)
-#         # self.conv1xz = nn.Sequential(nn.Conv2d(nf * 16, nf * 16, 1, stride=1, bias=False),
-#         #                              nn.LeakyReLU(0.2, inplace=True))
-#         self.conv2xz = nn.Sequential(nn.Conv2d(nf * 16, 1, 1, stride=1, bias=False), nn.LeakyReLU(0.2, inplace=True))
-#         self.fc_out_joint = blocks.LinearUnconditionalLogits(s0 * s0)
-#
-#     def inf_x(self,img):
-#         out = self.conv_img(img)
-#
-#         out = self.resnet_0_0_img(out)
-#         out = self.resnet_0_1_img(out)
-#         out = F.avg_pool2d(out, 3, stride=2, padding=1)
-#         out = self.resnet_1_0_img(out)
-#         out = self.resnet_1_1_img(out)
-#         out = F.avg_pool2d(out, 3, stride=2, padding=1)
-#         out = self.resnet_2_0_img(out)
-#         #if seg size = 8
-#         out = F.avg_pool2d(out, 3, stride=2, padding=1)
-#
-#         out = self.resnet_2_1_img(out)
-#         return out
-#
-#     def inf_seg(self, seg):
-#         out = self.conv1z(seg)
-#         out = self.conv2z(out)
-#         # out = self.resnet_3_0_seg(seg)
-#         # out = self.resnet_3_1_seg(out)
-#         # out = self.resnet_3_2_seg(out)
-#         # out = self.resnet_3_3_seg(out)
-#         return out
-#
-#     def inf_xseg(self,xseg):
-#         out = self.resnet_4_0(xseg)
-#         out = self.resnet_4_1(out)
-#         out = F.avg_pool2d(out, 3, stride=2, padding=1)
-#
-#         # out = self.conv1xz(out)
-#         out = self.conv2xz(out)
-#
-#         out = out.view(out.size(0),-1)
-#         out = self.fc_out_joint(out)
-#         return out
-#
-#     def forward(self, input, seg):
-#         # print("dim of seg and input  : ", seg.size(), input.size())
-#         inputbis = self.inf_x(input)
-#         seg = self.inf_seg(seg)
-#         # print(seg.size(), inputbis.size())
-#         xseg = torch.cat((inputbis, seg), dim=1)
-#         xseg = self.inf_xseg(xseg)
-#
-#         forQdisc = inputbis
-#
-#         return forQdisc, xseg
 
 class BiGANDiscriminator(nn.Module):
     def __init__(self,
                  nlabels,
-                 local_nlabels=None,
-                 features='penultimate',
-                 pack_size=1,
-                 qhead_withImg=False,
-                 img_path=False,
-                 nc=3,
-                 ndf=64,
-                 img_size=0,
-                 label_size=0,
+                 local_nlabels,
+                 img_size,
+                 label_size,
+                 nfilter=64,
                  **kwargs):
-        super(BiGANDiscriminator, self).__init__()
-        # print("USING BiGAN Discriminator", "qhead disc only with img network :", qhead_withImg)
-        self.ndf = ndf
+        super().__init__()
+        s0 = self.s0 = label_size
+        print("value of s0 in BiGAN DISC : ", s0)
+        nf = self.nf = nfilter
         self.nlabels = nlabels
         self.local_nlabels = local_nlabels
+        self.img_size = img_size
+        self.label_size =label_size
 
-        self.qhead_withImg = qhead_withImg
-        self.img_path = img_path
+        bn = blocks.Identity
 
+        #inference over x
+        self.conv_img = nn.Conv2d(3, 1 * nf, 3, padding=1)
 
-        # self.final_res = img_size // (2 ** 3)  # if conv5 and conv6 are added
+        self.resnet_0_0_img = ResnetBlock(1 * nf, 1 * nf, bn)
+        self.resnet_0_1_img = ResnetBlock(1 * nf, 2 * nf, bn)
 
-        #inference over img
-        self.conv1 = nn.Sequential(nn.Conv2d(3 * pack_size, ndf, 3, 1, 1),
-                                   nn.BatchNorm2d(ndf),
-                                   nn.LeakyReLU(0.2, inplace=True))
+        self.resnet_1_0_img = ResnetBlock(2 * nf, 2 * nf, bn)
+        self.resnet_1_1_img = ResnetBlock(2 * nf, 4 * nf, bn)
 
-        self.conv2 = nn.Sequential(nn.Conv2d(ndf, ndf, 4, 2, 1),
-                                   nn.BatchNorm2d(ndf),
-                                   nn.LeakyReLU(0.2, inplace=True))
+        self.resnet_2_0_img = ResnetBlock(4 * nf, 4 * nf, bn)
+        self.resnet_2_1_img = ResnetBlock(4 * nf, 8 * nf, bn)
 
-        self.conv3 = nn.Sequential(nn.Conv2d(ndf, ndf * 2, 3, 1, 1),
-                                   nn.BatchNorm2d(ndf * 2),
-                                   nn.LeakyReLU(0.2, inplace=True))
-
-        self.conv4 = nn.Sequential(nn.Conv2d(ndf * 2, ndf * 2, 4, 2, 1),
-                                   nn.BatchNorm2d(ndf * 2),
-                                   nn.LeakyReLU(0.2, inplace=True))
-
-        self.conv5 = nn.Sequential(nn.Conv2d(ndf * 2, ndf * 4, 4, 2, 1),
-                                   nn.BatchNorm2d(ndf * 4),
-                                   nn.LeakyReLU(0.2, inplace=True))
-
-
-        if self.img_path:
-            self.conv7 = nn.Sequential(nn.Conv2d(ndf * 8, ndf * 8, 4, 2, 1),
-                                       nn.BatchNorm2d(ndf * 8),
-                                       nn.LeakyReLU(0.2, inplace=True))
-            self.fc_out_img = blocks.LinearUnconditionalLogits(ndf * 8*4*4) #nn.Sequential(nn.Conv2d(ndf * 8, 1, 1, stride=1, bias=False), nn.LeakyReLU(0.2, inplace=True))
-
-
+        ndf = nf
         #inference over seg
-        self.conv1z =nn.Sequential(nn.Conv2d(self.local_nlabels, ndf * 4, 1, 1, padding = 0, bias = False), nn.LeakyReLU(0.2, inplace=True))
-        self.conv2z = nn.Sequential(nn.Conv2d(ndf * 4, ndf * 4, 1, 1, padding=0, bias=False), nn.LeakyReLU(0.2, inplace=True))
+        self.conv1z = nn.Sequential(nn.Conv2d(self.local_nlabels, ndf * 2, 1, 1, padding=0, bias=False),
+                                    nn.LeakyReLU(0.2, inplace=True))
+        self.conv2z = nn.Sequential(nn.Conv2d(ndf * 2, ndf * 4, 1, 1, padding=0, bias=False),
+                                    nn.LeakyReLU(0.2, inplace=True))
+        self.conv3z = nn.Sequential(nn.Conv2d(ndf * 4, ndf * 8, 1, 1, padding=0, bias=False),
+                                    nn.LeakyReLU(0.2, inplace=True))
 
-        # Joint inference
-        self.conv1xz = nn.Sequential(nn.Conv2d(ndf * 8, ndf * 8, 1, stride=1, bias=False), nn.LeakyReLU(0.2, inplace=True))
-        self.conv2xz = nn.Sequential(nn.Conv2d(ndf * 8, ndf * 8, 1, stride=1, bias=False), nn.LeakyReLU(0.2, inplace=True))
-        self.conv3xz = nn.Sequential(nn.Conv2d(ndf * 8, 1, 1, stride=1, bias=False), nn.LeakyReLU(0.2, inplace=True))
-        #comment fc_out_joint to ouput a map of 8x8 to compute bin crossentropy on that :
-        self.fc_out_joint = blocks.LinearUnconditionalLogits(8*8)
-        # self.conv4xz = nn.Sequential(nn.Conv2d(1, 1, 4, 2,1, bias=False), nn.LeakyReLU(0.2, inplace=True))
+        # self.resnet_3_0_seg = ResnetBlock(self.local_nlabels, 4 * nf, bn)
+        # self.resnet_3_1_seg = ResnetBlock(4 * nf, 8 * nf, bn)
+        # self.resnet_3_2_seg = ResnetBlock(2 * nf, 4 * nf, bn)
+        # self.resnet_3_3_seg = ResnetBlock(4 * nf, 8 * nf, bn)
 
-    def inf_x(self, img):
-        out = self.conv1(img)   #to try : with dropout as in initial bigan model
-        out = self.conv2(out)
-        out = self.conv3(out)
-        out = self.conv4(out)
-        out = self.conv5(out)
+        #joint inference
+        self.resnet_4_0 = ResnetBlock(16 * nf, 16 * nf, bn=False, use_shortcut=True, is_bias=False)
+        self.resnet_4_1 = ResnetBlock(16 * nf, 16 * nf, bn=False, use_shortcut=True, is_bias=False)
+        # self.conv1xz = nn.Sequential(nn.Conv2d(nf * 16, nf * 16, 1, stride=1, bias=False),
+        #                              nn.LeakyReLU(0.2, inplace=True))
+        self.conv2xz = nn.Sequential(nn.Conv2d(nf * 16, 1, 1, stride=1, bias=False), nn.LeakyReLU(0.2, inplace=True))
+        self.fc_out_joint = blocks.LinearUnconditionalLogits(s0 * s0)
+
+        # self.conv1xz = nn.Sequential(nn.Conv2d(ndf * 16, ndf * 16, 1, stride=1, bias=False),
+        #                              nn.LeakyReLU(0.2, inplace=True))
+        # self.conv2xz = nn.Sequential(nn.Conv2d(ndf * 16, ndf * 16, 1, stride=1, bias=False), nn.LeakyReLU(0.2, inplace=True))
+        # self.conv3xz = nn.Sequential(nn.Conv2d(ndf * 16, 1, 1, stride=1, bias=False), nn.LeakyReLU(0.2, inplace=True))
+        # self.fc_out_joint = blocks.LinearUnconditionalLogits(8*8)
+
+
+    def inf_x(self,img):
+        out = self.conv_img(img)
+        out = self.resnet_0_0_img(out)
+        out = self.resnet_0_1_img(out)
+        out = F.avg_pool2d(out, 3, stride=2, padding=1)
+        out = self.resnet_1_0_img(out)
+        out = self.resnet_1_1_img(out)
+        out = F.avg_pool2d(out, 3, stride=2, padding=1)
+        out = self.resnet_2_0_img(out)
+        if self.img_size // self.label_size ==8:
+            out = F.avg_pool2d(out, 3, stride=2, padding=1)
+
+        out = self.resnet_2_1_img(out)
         return out
 
-    def inf_seg(self,seg):
+    def inf_seg(self, seg):
+        # out = self.resnet_3_0_seg(seg)
+        # out = self.resnet_3_1_seg(out)
+        # out = self.resnet_3_2_seg(out)
+        # out = self.resnet_3_3_seg(out)
+
         out = self.conv1z(seg)
         out = self.conv2z(out)
+        out = self.conv3z(out)
         return out
 
     def inf_xseg(self,xseg):
-        out = self.conv1xz(xseg)
-        forQdisc = self.conv2xz(out)
-        out = self.conv3xz(forQdisc)
-        out = out.view(out.size(0), -1)
-        out = self.fc_out_joint(out)
-        # out = self.conv4xz(out)
-        return forQdisc, out
+        out = self.resnet_4_0(xseg)
+        out = self.resnet_4_1(out)
+        # out = F.avg_pool2d(out, 3, stride=2, padding=1)
 
+        # out = self.conv1xz(out)
+        out = self.conv2xz(out)
+
+        out = out.view(out.size(0),-1)
+        out = self.fc_out_joint(out)
+
+        # out = self.conv1xz(xseg)
+        # out = self.conv2xz(out)
+        # out = self.conv3xz(out)
+        # out = out.view(out.size(0), -1)
+        # out = self.fc_out_joint(out)
+        return out
 
     def forward(self, input, seg):
+        # print("dim of seg and input  : ", seg.size(), input.size())
         inputbis = self.inf_x(input)
         seg = self.inf_seg(seg)
-        # print("in disc : ", seg.size(), inputbis.size())
-        xseg = torch.cat((inputbis, seg), dim = 1)
-        forQdisc, xseg = self.inf_xseg(xseg)
+        # print(seg.size(), inputbis.size())
+        xseg = torch.cat((inputbis, seg), dim=1)
+        xseg = self.inf_xseg(xseg)
 
-        if not self.qhead_withImg:
-            forQdisc = forQdisc
-        else:
-            forQdisc = inputbis
+        forQdisc = inputbis
 
-        if not self.img_path:
-            return forQdisc, xseg
-        else:
-            input = self.conv6(inputbis)
-            input = self.conv7(input)
-            input = input.view(input.size(0),-1)
-            input = self.fc_out_img(input)
-            # print("img path", input.size(), xseg.size())
-            return forQdisc, xseg, input
+        return forQdisc, xseg
+
+# class BiGANDiscriminator(nn.Module):
+#     def __init__(self,
+#                  nlabels,
+#                  local_nlabels=None,
+#                  features='penultimate',
+#                  pack_size=1,
+#                  qhead_withImg=False,
+#                  img_path=False,
+#                  nc=3,
+#                  ndf=64,
+#                  img_size=0,
+#                  label_size=0,
+#                  **kwargs):
+#         super(BiGANDiscriminator, self).__init__()
+#         # print("USING BiGAN Discriminator", "qhead disc only with img network :", qhead_withImg)
+#         self.ndf = ndf
+#         self.nlabels = nlabels
+#         self.local_nlabels = local_nlabels
+#
+#         self.qhead_withImg = qhead_withImg
+#         self.img_path = img_path
+#
+#
+#         # self.final_res = img_size // (2 ** 3)  # if conv5 and conv6 are added
+#
+#         #inference over img
+#         self.conv1 = nn.Sequential(nn.Conv2d(3 * pack_size, ndf, 3, 1, 1),
+#                                    nn.BatchNorm2d(ndf),
+#                                    nn.LeakyReLU(0.2, inplace=True))
+#
+#         self.conv2 = nn.Sequential(nn.Conv2d(ndf, ndf, 4, 2, 1),
+#                                    nn.BatchNorm2d(ndf),
+#                                    nn.LeakyReLU(0.2, inplace=True))
+#
+#         self.conv3 = nn.Sequential(nn.Conv2d(ndf, ndf * 2, 3, 1, 1),
+#                                    nn.BatchNorm2d(ndf * 2),
+#                                    nn.LeakyReLU(0.2, inplace=True))
+#
+#         self.conv4 = nn.Sequential(nn.Conv2d(ndf * 2, ndf * 2, 4, 2, 1),
+#                                    nn.BatchNorm2d(ndf * 2),
+#                                    nn.LeakyReLU(0.2, inplace=True))
+#
+#         self.conv5 = nn.Sequential(nn.Conv2d(ndf * 2, ndf * 4, 4, 2, 1),
+#                                    nn.BatchNorm2d(ndf * 4),
+#                                    nn.LeakyReLU(0.2, inplace=True))
+#
+#
+#         if self.img_path:
+#             self.conv7 = nn.Sequential(nn.Conv2d(ndf * 8, ndf * 8, 4, 2, 1),
+#                                        nn.BatchNorm2d(ndf * 8),
+#                                        nn.LeakyReLU(0.2, inplace=True))
+#             self.fc_out_img = blocks.LinearUnconditionalLogits(ndf * 8*4*4) #nn.Sequential(nn.Conv2d(ndf * 8, 1, 1, stride=1, bias=False), nn.LeakyReLU(0.2, inplace=True))
+#
+#
+#         #inference over seg
+#         self.conv1z =nn.Sequential(nn.Conv2d(self.local_nlabels, ndf * 4, 1, 1, padding = 0, bias = False), nn.LeakyReLU(0.2, inplace=True))
+#         self.conv2z = nn.Sequential(nn.Conv2d(ndf * 4, ndf * 4, 1, 1, padding=0, bias=False), nn.LeakyReLU(0.2, inplace=True))
+#
+#         # Joint inference
+#         self.conv1xz = nn.Sequential(nn.Conv2d(ndf * 8, ndf * 8, 1, stride=1, bias=False), nn.LeakyReLU(0.2, inplace=True))
+#         self.conv2xz = nn.Sequential(nn.Conv2d(ndf * 8, ndf * 8, 1, stride=1, bias=False), nn.LeakyReLU(0.2, inplace=True))
+#         self.conv3xz = nn.Sequential(nn.Conv2d(ndf * 8, 1, 1, stride=1, bias=False), nn.LeakyReLU(0.2, inplace=True))
+#         #comment fc_out_joint to ouput a map of 8x8 to compute bin crossentropy on that :
+#         self.fc_out_joint = blocks.LinearUnconditionalLogits(8*8)
+#         # self.conv4xz = nn.Sequential(nn.Conv2d(1, 1, 4, 2,1, bias=False), nn.LeakyReLU(0.2, inplace=True))
+#
+#     def inf_x(self, img):
+#         out = self.conv1(img)   #to try : with dropout as in initial bigan model
+#         out = self.conv2(out)
+#         out = self.conv3(out)
+#         out = self.conv4(out)
+#         out = self.conv5(out)
+#         return out
+#
+#     def inf_seg(self,seg):
+#         out = self.conv1z(seg)
+#         out = self.conv2z(out)
+#         return out
+#
+#     def inf_xseg(self,xseg):
+#         out = self.conv1xz(xseg)
+#         forQdisc = self.conv2xz(out)
+#         out = self.conv3xz(forQdisc)
+#         out = out.view(out.size(0), -1)
+#         out = self.fc_out_joint(out)
+#         # out = self.conv4xz(out)
+#         return forQdisc, out
+#
+#
+#     def forward(self, input, seg):
+#         inputbis = self.inf_x(input)
+#         seg = self.inf_seg(seg)
+#         # print("in disc : ", seg.size(), inputbis.size())
+#         xseg = torch.cat((inputbis, seg), dim = 1)
+#         forQdisc, xseg = self.inf_xseg(xseg)
+#
+#         if not self.qhead_withImg:
+#             forQdisc = forQdisc
+#         else:
+#             forQdisc = inputbis
+#
+#         if not self.img_path:
+#             return forQdisc, xseg
+#         else:
+#             input = self.conv6(inputbis)
+#             input = self.conv7(input)
+#             input = input.view(input.size(0),-1)
+#             input = self.fc_out_img(input)
+#             # print("img path", input.size(), xseg.size())
+#             return forQdisc, xseg, input
 
 
 
@@ -636,7 +563,7 @@ class BiGANQHeadDiscriminator(nn.Module):
         # self.conv1 = nn.Conv2d(ndf *16, 512, 8, bias=False)
         #
         # self.bn1 = nn.BatchNorm2d(512)
-        self.conv2 = nn.Conv2d(256, 256, size, bias=False)
+        self.conv2 = nn.Conv2d(512, 256, size, bias=False)
         self.bn2 = nn.BatchNorm2d(256)
 
         self.conv_mu = nn.Conv2d(256, z_dim, 1)

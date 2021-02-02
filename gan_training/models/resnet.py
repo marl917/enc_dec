@@ -257,7 +257,7 @@ class LabelGenerator(nn.Module):
         logits = self.conv_img(actvn(out))
 
         label_map, y_unorm = self.gumble_softmax(logits)
-        return label_map, y_unorm
+        return y_unorm, label_map
 
 
 class BiGANDiscriminator(nn.Module):

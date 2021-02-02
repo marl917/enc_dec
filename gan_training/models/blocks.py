@@ -92,7 +92,7 @@ class ResnetBlock(nn.Module):
     def __init__(self,
                  fin,
                  fout,
-                 bn,
+                 bn=True,
                  use_shortcut=False,
                  fhidden=None,
                  is_bias=True):
@@ -114,6 +114,9 @@ class ResnetBlock(nn.Module):
                       stride=1,
                       padding=1,
                       bias=is_bias)
+        # self.conv_1 = spectral_norm(self.conv_1)
+        # self.conv_0 = spectral_norm(self.conv_0)
+
         if self.learned_shortcut:
             self.conv_s = nn.Conv2d(self.fin,
                           self.fout,
@@ -121,15 +124,22 @@ class ResnetBlock(nn.Module):
                           stride=1,
                           padding=0,
                           bias=False)
-        self.bn0 = bn(self.fin)
-        self.bn1 = bn(self.fhidden)
+            # self.conv_s = spectral_norm(self.conv_s)
+        if bn:
+            self.bn0 = BatchNorm2d(self.fin)
+            self.bn1 = BatchNorm2d(self.fhidden)
+        else:
+            self.bn0 = Identity(self.fin)
+            self.bn1 = Identity(self.fhidden)
 
     def forward(self, x):
         x_s = self._shortcut(x)
+        # dx = self.conv_0(actvn(self.bn0(x)))
+        # dx = self.conv_1(actvn(self.bn1(dx)))
         dx = self.conv_0(actvn(self.bn0(x)))
         dx = self.conv_1(actvn(self.bn1(dx)))
         # out = x_s + 0.1 * dx
-        out = x_s + 0.9*dx
+        out = x_s +0.1*dx
         return out
 
     def _shortcut(self, x):
