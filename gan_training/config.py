@@ -74,7 +74,7 @@ def build_models(config):
         nlabels=config['encoder']['nlabels'],
         local_nlabels=config['encoder']['n_locallabels'],
         img_size=config['data']['img_size'],
-        label_size = config['label_generator']['size'],
+        label_size = config['label_generator']['label_size'],
         **config['encoder']['kwargs'])
 
     discriminator = None
