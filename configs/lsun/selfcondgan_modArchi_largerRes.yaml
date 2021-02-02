@@ -1,0 +1,20 @@
+decoder:
+  deterministicOnSeg: True
+  nlabels: 1
+  n_locallabels: 10
+encoder:
+  nlabels: 1
+  n_locallabels: 10
+discriminator:
+  nlabels: 1
+  n_locallabels: 10
+label_generator:
+  label_size: 16
+  nlabels: 1
+  n_locallabels: 10
+  conditioning: unconditional
+inherit_from: configs/lsun/default.yaml
+training:
+  out_dir: output/lsun/selfcondgan_labelRes16_modArchi
+  reg_param: 0.1
+  con_loss: True
