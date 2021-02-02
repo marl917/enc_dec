@@ -271,7 +271,6 @@ def main():
 
             dloss = trainer.discriminator_trainstep(x_real, z, z_lab)
 
-
             # Print stats
             if it % log_every == 0:
                 print('[epoch %0d, it %4d]' % (epoch_idx, it))

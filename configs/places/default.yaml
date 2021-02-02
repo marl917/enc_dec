@@ -1,31 +1,44 @@
 data:
   type: image
-  train_dir: data/places365/train
-  test_dir: data/places365/val
+  train_dir: data/places/train
+  test_dir: data/places/val
   img_size: 128
   nlabels: 365
-generator:
-  name: resnet2
+decoder:
+  name: resnet
   nlabels: 1
   conditioning: unconditional
+  kwargs:
+    placeholder: None
+encoder:
+  name: resnet
+  nlabels: 1
+  conditioning: unconditional
+  kwargs:
+    placeholder: None
+label_generator:
+  label_size: 16
+  name: resnet
+  zdim: 50
+  kwargs:
+    placeholder: None
 discriminator:
-  name: resnet2
-  nlabels: 1
-  conditioning: unconditional
+  name: resnet
 z_dist:
-  type: gauss
+  type: uniform
   dim: 256
-clusterer:
-  name: supervised
 training:
   gan_type: standard
   reg_type: real
   reg_param: 10.
-  take_model_average: true
+  take_model_average: false
   model_average_beta: 0.999
-  sample_nlabels: 20
+  sample_nlabels: 100
   log_every: 10
   inception_every: 10000
   backup_every: 5000
-  batch_size: 128
+  batch_size: 64
+  sample_every: 500
+
+
   

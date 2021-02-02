@@ -82,11 +82,11 @@ def get_dataset(name,
                                    transforms.Normalize((0.5, ), (0.5, ))
                                ]))
         nlabels = 1000
-    elif name == 'lsun':
-        if lsun_categories is None:
-            lsun_categories = 'train'
-        dataset = datasets.LSUN(data_dir, lsun_categories, transform)
-        nlabels = len(dataset.classes)
+    # elif name == 'lsun':
+    #     if lsun_categories is None:
+    #         lsun_categories = 'train'
+    #     dataset = datasets.LSUN(data_dir, lsun_categories, transform)
+    #     nlabels = len(dataset.classes)
     elif name == 'lsun_class':
         dataset = datasets.LSUNClass(data_dir,
                                      transform,
