@@ -97,25 +97,22 @@ class Encoder(nn.Module):
         self.img_size =img_size
         self.label_size = label_size
 
-
-        bn = blocks.Identity
-
         self.conv_img = nn.Conv2d(3, 1 * nf, 3, padding=1)
 
-        self.resnet_0_0 = ResnetBlock(1 * nf, 1 * nf, bn)
-        self.resnet_0_1 = ResnetBlock(1 * nf, 2 * nf, bn)
+        self.resnet_0_0 = ResnetBlock(1 * nf, 1 * nf)
+        self.resnet_0_1 = ResnetBlock(1 * nf, 2 * nf)
 
-        self.resnet_1_0 = ResnetBlock(2 * nf, 2 * nf, bn)
-        self.resnet_1_1 = ResnetBlock(2 * nf, 4 * nf, bn)
+        self.resnet_1_0 = ResnetBlock(2 * nf, 2 * nf)
+        self.resnet_1_1 = ResnetBlock(2 * nf, 4 * nf)
 
-        self.resnet_2_0 = ResnetBlock(4 * nf, 4 * nf, bn)
-        self.resnet_2_1 = ResnetBlock(4 * nf, 8 * nf, bn)
+        self.resnet_2_0 = ResnetBlock(4 * nf, 4 * nf)
+        self.resnet_2_1 = ResnetBlock(4 * nf, 8 * nf)
 
-        self.resnet_3_0 = ResnetBlock(8 * nf, 8 * nf, bn)
-        self.resnet_3_1 = ResnetBlock(8 * nf, 16 * nf, bn)
+        self.resnet_3_0 = ResnetBlock(8 * nf, 8 * nf)
+        self.resnet_3_1 = ResnetBlock(8 * nf, 16 * nf)
 
-        self.resnet_4_0 = ResnetBlock(16 * nf, 16 * nf, bn)
-        self.resnet_4_1 = ResnetBlock(16 * nf, 16 * nf, bn)
+        self.resnet_4_0 = ResnetBlock(16 * nf, 16 * nf)
+        self.resnet_4_1 = ResnetBlock(16 * nf, 16 * nf)
         #
         # self.resnet_5_0 = ResnetBlock(16 * nf, 16 * nf, bn, nlabels)
         # self.resnet_5_1 = ResnetBlock(16 * nf, 16 * nf, bn, nlabels)
@@ -205,27 +202,19 @@ class LabelGenerator(nn.Module):
         self.resnet_1_0 = ResnetBlock(16 * nf, 16 * nf)
         # self.resnet_1_1 = ResnetBlock(16 * nf, 16 * nf, bn, nlabels)
 
-        self.resnet_2_0 = ResnetBlock(16 * nf, 8 * nf, bn)
-        self.resnet_2_1 = ResnetBlock(8 * nf, 8 * nf, bn)
+        self.resnet_2_0 = ResnetBlock(16 * nf, 8 * nf)
+        self.resnet_2_1 = ResnetBlock(8 * nf, 8 * nf)
 
         # self.resnet_0_0 = ResnetBlock(8 * nf, 8 * nf)
 
-        self.resnet_3_0 = ResnetBlock(8 * nf, 4 * nf, bn)
-        self.resnet_3_1 = ResnetBlock(4 * nf, 4 * nf, bn)
+        self.resnet_3_0 = ResnetBlock(8 * nf, 4 * nf)
+        self.resnet_3_1 = ResnetBlock(4 * nf, 4 * nf)
 
-        self.resnet_4_0 = ResnetBlock(4 * nf, 2 * nf, bn)
+        self.resnet_4_0 = ResnetBlock(4 * nf, 2 * nf)
         # self.resnet_4_1 = ResnetBlock(2 * nf, 2 * nf, bn, nlabels)
 
-        self.resnet_5_0 = ResnetBlock(2 * nf, 1 * nf, bn)
-        self.resnet_5_1 = ResnetBlock(1 * nf, 1 * nf, bn)
-
-        # self.resnet_1_0 = ResnetBlock(8 * nf, 4 * nf)
-        #
-        # self.resnet_2_0 = ResnetBlock(4 * nf, 4 * nf)
-        #
-        # self.resnet_4_0 = ResnetBlock(4 * nf, 2 * nf)
-        #
-        # self.resnet_5_0 = ResnetBlock(2 * nf, 1 * nf)
+        self.resnet_5_0 = ResnetBlock(2 * nf, 1 * nf)
+        self.resnet_5_1 = ResnetBlock(1 * nf, 1 * nf)
 
         self.conv_img = nn.Sequential(nn.Conv2d(nf, self.local_nlabels, 3, padding = 1), nn.LogSoftmax(dim=1))
 
@@ -589,7 +578,6 @@ class BiGANQHeadDiscriminator(nn.Module):
         self.conv_var = nn.Conv2d(256, z_dim, 1)
 
     def forward(self,x):
-        print(x.size())
         x = F.leaky_relu(self.bn1(self.conv1(x)), 0.1, inplace=True)
         x = F.leaky_relu(self.bn2(self.conv2(x)), 0.1, inplace=True)
         mu = self.conv_mu(x).squeeze()

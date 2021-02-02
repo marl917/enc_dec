@@ -1,16 +1,20 @@
-generator:
-  nlabels: 100
-  conditioning: embedding
+decoder:
+  deterministicOnSeg: True
+  nlabels: 1
+  n_locallabels: 20
+encoder:
+  nlabels: 1
+  n_locallabels: 20
 discriminator:
-  nlabels: 100
-  conditioning: mask
-clusterer:
-  name: selfcondgan
-  nimgs: 50000
-  kwargs: 
-    k_value: 100
+  nlabels: 1
+  n_locallabels: 20
+label_generator:
+  label_size: 16
+  nlabels: 1
+  n_locallabels: 20
+  conditioning: unconditional
 inherit_from: configs/imagenet/default.yaml
 training:
-  out_dir: output/imagenet/selfcondgan
-  recluster_every: 75000
+  out_dir: output/imagenet/selfcondgan_labelRes16_K2_20
   reg_param: 0.1
+  con_loss: True
