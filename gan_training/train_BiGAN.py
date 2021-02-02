@@ -87,6 +87,7 @@ class Trainer(object):
         if self.con_loss:
             mu, var = self.qhead_discriminator(g_fake[0])
             con_loss = self.normalNLLLoss(z_lab,mu,var) * 0.1
+            # print("mu and var max min", torch.min(var), torch.max(var))
         #second part : train encoder
 
         label_map_real_unorm, label_map_real= self.encoder(x_real)

@@ -11,7 +11,6 @@ discriminator:
   name: dcgan_deep_onlylocal_clust_bigan
   kwargs:
     qhead_withImg: True
-    img_path: False
   nlabels: 1
   n_locallabels: 2
 label_generator:
@@ -28,6 +27,6 @@ label_discriminator:
   conditioning: unconditional
 inherit_from: configs/cifar/default.yaml
 training:
-  out_dir: output/cifar/K2_10_BiGAN_detOnSeg_CONLOSSIMG_2Classes
+  out_dir: output/cifar/K2_2_withDisc_BiGAN_detOnSeg_CONLOSSIMG_ImgSeg_2classes
   use_disc: True
   con_loss: True

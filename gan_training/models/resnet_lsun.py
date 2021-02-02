@@ -548,10 +548,7 @@ class BiGANQHeadDiscriminator(nn.Module):
                  local_nlabels=None,
                  size=None,
                  z_dim=1,
-                 features='penultimate',
-                 pack_size=1,
-                 qhead_withImg=False,
-                 nc=3,
+                 qhead_variant=False,
                  ndf=64,
                  **kwargs):
         super(BiGANQHeadDiscriminator, self).__init__()
@@ -559,21 +556,33 @@ class BiGANQHeadDiscriminator(nn.Module):
         self.ndf = ndf
         self.nlabels = nlabels
         self.local_nlabels = local_nlabels
+        self.qhead_variant = qhead_variant
 
         # self.conv1 = nn.Conv2d(ndf *16, 512, 8, bias=False)
         #
         # self.bn1 = nn.BatchNorm2d(512)
         self.conv2 = nn.Conv2d(512, 256, size, bias=False)
         self.bn2 = nn.BatchNorm2d(256)
-
-        self.conv_mu = nn.Conv2d(256, z_dim, 1)
-        self.conv_var = nn.Conv2d(256, z_dim, 1)
+        if qhead_variant:
+            self.conv3 = nn.Conv2d(256, 256, size, bias=False)
+            self.bn3 = nn.BatchNorm2d(256)
+            print("Qhead discriminator with variant")
+            self.conv4 = nn.Conv2d(256, 128, size, bias=False)
+            self.bn4 = nn.BatchNorm2d(128)
+            self.conv_mu = nn.Conv2d(128, z_dim, 1)
+            self.conv_var = nn.Conv2d(128, z_dim, 1)
+        else:
+            self.conv_mu = nn.Conv2d(256, z_dim, 1)
+            self.conv_var = nn.Conv2d(256, z_dim, 1)
 
 
 
     def forward(self,x):
         # x = F.leaky_relu(self.bn1(self.conv1(x)), 0.1, inplace=True)
         x = F.leaky_relu(self.bn2(self.conv2(x)), 0.1, inplace=True)
+        if self.qhead_variant:
+            x = F.leaky_relu(self.bn3(self.conv3(x)), 0.1, inplace=True)
+            x = F.leaky_relu(self.bn4(self.conv4(x)), 0.1, inplace=True)
         mu = self.conv_mu(x).squeeze()
         var = torch.exp(self.conv_var(x).squeeze())
         return mu, var

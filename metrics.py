@@ -91,8 +91,11 @@ while len(dirs) > 0:
             if not os.path.exists(outdir) and config['pretrained'] == {}:
                 print('Skipping', path, 'outdir', outdir)
                 continue
-
-            results_dir = os.path.join(outdir, 'results')
+            if args.useLabelGen:
+                file = 'results_labelGen'
+            else:
+                file = 'results_reconstruction'
+            results_dir = os.path.join(outdir, file)
             checkpoint_dir = os.path.join(outdir, 'chkpts')
             os.makedirs(results_dir, exist_ok=True)
 
@@ -148,8 +151,8 @@ while len(dirs) > 0:
                                                 iteration_label_gen=int(it))
                         dataset_name = get_dataset_from_path(path)
 
-                        # samples = sample(sampler, args.useLabelGen)
-                        # np.savez(samples_path, fake=samples, real=dataset_name)
+                        samples = sample(sampler, args.useLabelGen)
+                        np.savez(samples_path, fake=samples, real=dataset_name)
 
                     arguments = f'--samples {samples_path} --it {it} --results_dir {results_dir}'
                     if args.fid and it not in fid_results:

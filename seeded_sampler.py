@@ -88,8 +88,8 @@ class SeededSampler():
             x_real,y=next(iter(self.train_loader))
             z = self.zdist.sample((self.batch_size,))
             x_real= x_real.to('cuda')
-            _, _, label_map = self.encoderOrLabGen(x_real)
-            return self.decoder(z, label_map)[:nimgs,:,:,:], None
+            _, label_map = self.encoderOrLabGen(x_real)
+            return self.decoder(seg= label_map, input = z)[:nimgs,:,:,:], None
 
     def sample_fromLabelGenerator(self,nimgs): #to use if useLabelGen=True
         self.decoder.eval()
@@ -140,8 +140,8 @@ class SeededSampler():
         print("checkpoint dir : ", checkpoint_dir, model_name)
         self.checkpoint_io = checkpoint_io
 
+        decoder, encoder, discriminator, label_generator, qhead_discriminator = build_models(self.config)
         if not useLabelGen:
-            decoder, encoder, disc = build_models(self.config)
             decoder = decoder.to(self.device)
             decoder = nn.DataParallel(decoder)
 
@@ -171,10 +171,6 @@ class SeededSampler():
             print('Loaded iteration:', it['it'])
             return decoder_test, encoder
         else:
-
-            # decoder, encoder, label_generator, _, _ = build_models(self.config)
-            decoder, encoder, discriminator, label_generator, _, qhead_discriminator = build_models(self.config)
-            # decoder, encoder, discriminator, label_generator, label_discriminator = build_models(self.config)
             print("size img config" , self.config['data']['img_size'])
             label_generator = label_generator.to(self.device)
             label_generator = nn.DataParallel(label_generator)
@@ -187,7 +183,7 @@ class SeededSampler():
             if iteration_label_gen!=None:
                 it_lab = iteration_label_gen
             else:
-                it_lab = utils.get_most_recent(os.path.join(exp_out_dir, 'chkpts'), 'label_gen')
+                it_lab = utils.get_most_recent(os.path.join(exp_out_dir, 'chkpts'), 'model')
             print("Loading iteration from label gen pretrained model : ", it_lab)
 
             try:

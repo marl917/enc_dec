@@ -267,14 +267,19 @@ def main():
             z_lab = zdist_lab.sample((batch_size,))
             zbis = zdist.sample((batch_size,))
 
-            losses = trainer.encoderdecoder_trainstep(x_real, z, z_lab=z_lab, check_norm = (it%200 ==0))
+            gloss = trainer.encoderdecoder_trainstep(x_real, z, z_lab=z_lab, check_norm = (it%200 ==0))
 
             dloss = trainer.discriminator_trainstep(x_real, z, z_lab)
+
+            for key, value in gloss.items():
+                logger.add('losses', key, value, it=it)
+            for key, value in dloss.items():
+                logger.add('losses', key, value, it=it)
 
             # Print stats
             if it % log_every == 0:
                 print('[epoch %0d, it %4d]' % (epoch_idx, it))
-                print(losses)
+                print(gloss)
                 print(dloss)
 
             # (i) Sample if necessary
