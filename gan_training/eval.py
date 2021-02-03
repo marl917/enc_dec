@@ -93,7 +93,7 @@ class Evaluator(object):
             _,label_map = self.label_generator(z_lab)
 
             # print("generator labels : ", torch.argmax(label_map, dim=1).long())
-            
+
             # save_lab = torch.unsqueeze(torch.argmax(label_map, dim=1), dim=1).float()
             # torchvision.utils.save_image(save_lab, os.path.join(out_dir, 'label_maps.png'))
 
