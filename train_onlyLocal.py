@@ -283,7 +283,7 @@ def main():
                 print(dloss)
 
             # (i) Sample if necessary
-            if it % config['training']['sample_every'] == 0:
+            if it % config['training']['sample_every'] == 0 or True :
                 print("it", it)
                 print('Creating samples...')
 
@@ -291,7 +291,7 @@ def main():
                 logger.add_imgs(x, 'all', it)
 
                 z_lab = zdist_lab.sample((ntest,))
-                x = evaluator.create_samples_labelGen(z_test, z_lab)
+                x = evaluator.create_samples_labelGen(z_test, z_lab, out_dir=out_dir)
                 logger.add_imgs(x, 'all', it+1)
 
 

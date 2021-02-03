@@ -2,6 +2,8 @@ import numpy as np
 import torch
 from torch.nn import functional as F
 from gan_training import utils
+import torchvision
+import os
 
 from gan_training.metrics import inception_score
 
@@ -84,12 +86,17 @@ class Evaluator(object):
 
         return score, score_std
 
-    def create_samples_labelGen(self,z, z_lab):
+    def create_samples_labelGen(self,z, z_lab, out_dir=None):
         self.decoder.eval()
         self.label_generator.eval()
         with torch.no_grad():
             _,label_map = self.label_generator(z_lab)
-            print("generator labels : ", torch.argmax(label_map, dim=1)[0])
+
+            # print("generator labels : ", torch.argmax(label_map, dim=1).long())
+            
+            # save_lab = torch.unsqueeze(torch.argmax(label_map, dim=1), dim=1).float()
+            # torchvision.utils.save_image(save_lab, os.path.join(out_dir, 'label_maps.png'))
+
             x_fake1 = self.decoder(seg = label_map, input=z)
 
             # z_Bis = self.sample_z(z.size(0))

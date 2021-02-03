@@ -242,6 +242,87 @@ class Encoder(nn.Module):
 #
 #         return label_map_unorm, label_map
 
+# class LabelGenerator(nn.Module):
+#     def __init__(self,
+#                  nlabels,
+#                  conditioning,
+#                  z_dim=128,
+#                  local_nlabels=0,
+#                  ngf=64,
+#                  embed_dim=256,
+#                  label_size=0,
+#                  **kwargs):
+#         super(LabelGenerator, self).__init__()
+#         size = 8
+#         assert conditioning != 'unconditional' or nlabels == 1
+#         self.sw = size // (2 ** 2)
+#         self.sh = self.sw
+#
+#         nc= local_nlabels
+#
+#         if conditioning == 'embedding':
+#             self.get_latent = blocks.LatentEmbeddingConcat(nlabels, embed_dim)
+#             self.fc = nn.Linear(z_dim + embed_dim, self.sh*self.sw * ngf * 8)
+#         elif conditioning == 'unconditional':
+#             self.get_latent = blocks.Identity()
+#             self.fc = nn.Linear(z_dim, self.sh*self.sw * ngf * 8)
+#         else:
+#             raise NotImplementedError(
+#                 f"{conditioning} not implemented for generator")
+#
+#         bn = blocks.BatchNorm2d
+#
+#         self.nlabels = nlabels
+#         self.local_nlabels = local_nlabels
+#
+#         self.conv1 = nn.ConvTranspose2d(ngf * 8, ngf * 8, 4, 2, 1)
+#         self.bn1 = bn(ngf * 8, nlabels)
+#
+#         self.conv1bis = nn.ConvTranspose2d(ngf * 8, ngf * 4, 3, 1, 1)
+#         self.bn1bis = bn(ngf * 4, nlabels)
+#
+#         self.conv2 = nn.ConvTranspose2d(ngf * 4, ngf * 4, 4, 2, 1)
+#         self.bn2 = bn(ngf * 4, nlabels)
+#
+#         self.conv2bis = nn.ConvTranspose2d(ngf * 4, ngf * 2, 3, 1, 1)
+#         self.bn2bis = bn(ngf * 2, nlabels)
+#
+#
+#         self.conv_out = nn.Sequential(nn.Conv2d(ngf*2, nc, 3, 1, 1), nn.LogSoftmax(dim=1))
+#
+#         self.FloatTensor = torch.cuda.FloatTensor if True \
+#             else torch.FloatTensor  # is_cuda
+#
+#     def sample_gumbel(self, shape, eps=1e-20):
+#         U = torch.rand(shape).cuda()
+#         return -Variable(torch.log(-torch.log(U + eps) + eps))
+#
+#     def gumbel_softmax_sample(self, logits, temperature):
+#         y = logits + self.sample_gumbel(logits.size())
+#         return F.softmax(y / temperature, dim=1), y
+#
+#     def gumble_softmax(self, logits):
+#         y, y_unorm= self.gumbel_softmax_sample(logits, temperature=1.0)
+#         x = torch.argmax(y, dim=1)
+#         x = torch.unsqueeze(x, dim=1)
+#         bs, _, h, w = x.size()
+#         input_label = self.FloatTensor(bs, self.local_nlabels, h, w).zero_()
+#         y_hard = input_label.scatter_(1, x.long().cuda(), 1.0)
+#         return (y_hard - y).detach() + y, y_unorm
+#
+#     def forward(self, input, y=None):
+#         out = self.get_latent(input, y)
+#         out = self.fc(out)
+#
+#         out = out.view(out.size(0), -1, self.sh, self.sw)
+#         out = F.relu(self.bn1(self.conv1(out), y))
+#         out = F.relu(self.bn1bis(self.conv1bis(out), y))
+#         out = F.relu(self.bn2(self.conv2(out), y))
+#         out = F.relu(self.bn2bis(self.conv2bis(out), y))
+#         logits = self.conv_out(out)
+#         label_map, y_unorm = self.gumble_softmax(logits)
+#         return y_unorm, label_map
+
 class LabelGenerator(nn.Module):
     def __init__(self,
                  z_dim,

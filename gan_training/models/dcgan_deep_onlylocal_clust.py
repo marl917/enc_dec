@@ -182,9 +182,9 @@ class BiGANDiscriminator(nn.Module):
                                    nn.BatchNorm2d(ndf * 4),
                                    nn.LeakyReLU(0.2, inplace=True))
 
-        # self.conv6 = nn.Sequential(nn.Conv2d(ndf * 4, ndf * 8, 3, 1, 1),
-        #                            nn.BatchNorm2d(ndf * 8),
-        #                            nn.LeakyReLU(0.2, inplace=True))
+        self.conv6 = nn.Sequential(nn.Conv2d(ndf * 4, ndf * 8, 3, 1, 1),
+                                   nn.BatchNorm2d(ndf * 8),
+                                   nn.LeakyReLU(0.2, inplace=True))
         if self.img_path:
             self.conv7 = nn.Sequential(nn.Conv2d(ndf * 8, ndf * 8, 4, 2, 1),
                                        nn.BatchNorm2d(ndf * 8),
