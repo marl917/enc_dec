@@ -151,8 +151,8 @@ while len(dirs) > 0:
                                                 iteration_label_gen=int(it))
                         dataset_name = get_dataset_from_path(path)
 
-                        samples = sample(sampler, args.useLabelGen)
-                        np.savez(samples_path, fake=samples, real=dataset_name)
+                        # samples = sample(sampler, args.useLabelGen)
+                        # np.savez(samples_path, fake=samples, real=dataset_name)
 
                     arguments = f'--samples {samples_path} --it {it} --results_dir {results_dir}'
                     if args.fid and it not in fid_results:

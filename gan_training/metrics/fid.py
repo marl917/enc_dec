@@ -193,7 +193,7 @@ def compute_fid_from_npz(path):
         fake_imgs = data['fake']
 
         name = None
-        for name in ['imagenet', 'cifar', 'places']:
+        for name in ['imagenet', 'cifar', 'places', 'lsun']:
             if name in path: 
                 real_imgs = name
                 break
@@ -224,7 +224,9 @@ precomputed_stats = {
     'imagenet':
     'output/imagenet_gt_stats.npz',
     'cifar':
-    'output/cifar_gt_stats.npz'
+    'output/cifar_gt_stats.npz',
+'lsun':
+    'output/lsun_gt_stats.npz'
 }
 
 
@@ -275,6 +277,17 @@ def compute_stats(exp_path):
             sess.run(tf.global_variables_initializer())
             m, s = calculate_activation_statistics(real_imgs, sess)
         np.savez(precomputed_stats['cifar'], m=m, s=s)
+
+    if 'lsun' in exp_path and not os.path.exists(precomputed_stats['lsun']):
+        with np.load('output/lsun_gt_imgs.npz') as data_real:
+            real_imgs = data_real['real']
+            print('loaded real lsun images', real_imgs.shape)
+        inception_path = check_or_download_inception(None)
+        create_inception_graph(inception_path)
+        with tf.Session() as sess:
+            sess.run(tf.global_variables_initializer())
+            m, s = calculate_activation_statistics(real_imgs, sess)
+        np.savez(precomputed_stats['lsun'], m=m, s=s)
 
 if __name__ == '__main__':
     import argparse

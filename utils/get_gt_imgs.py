@@ -17,6 +17,7 @@ def get_images(root, N):
     else:
         all_files = []
         for i, (dp, dn, fn) in enumerate(os.walk(os.path.expanduser(root))):
+            print(dp, dn, fn)
             for j, f in enumerate(fn):
                 if j >= 1000:
                     break     # don't get whole dataset, just get enough images per class
@@ -41,13 +42,27 @@ def get_transform(size):
 
 
 def get_gt_samples(dataset, nimgs=50000):
-    if dataset != 'cifar':
+    if dataset != 'cifar' and dataset!='lsun':
         transform = get_transform(sizes[dataset])
         all_images = get_images(paths[dataset], nimgs)
+        print(paths[dataset], dataset)
         images = []
         for file_path in tqdm(all_images[:nimgs]):
             images.append(transform(Image.open(file_path).convert('RGB')))
         return pt_to_np(torch.stack(images))
+    elif dataset == 'lsun':
+        data = datasets.LSUN(root='data/lsun/train',
+                                   classes=['church_outdoor_train'],
+                                   transform=get_transform(sizes[dataset]))
+        images = []
+        i=0
+        for x, y in tqdm(data):
+            i+=1
+            images.append(x)
+            if i>50000:
+                break
+        return pt_to_np(torch.stack(images))
+
     else:
         data = datasets.CIFAR10(paths[dataset], transform=get_transform(sizes[dataset]))
         images = []
@@ -60,16 +75,18 @@ def get_gt_samples(dataset, nimgs=50000):
 paths = {
     'imagenet': 'data/ImageNet',
     'places': 'data/Places365',
-    'cifar': 'data/CIFAR'
+    'cifar': 'data/CIFAR',
+    'lsun': 'data/lsun'
 }
 
-sizes = {'imagenet': 128, 'places': 128, 'cifar': 32}
+sizes = {'imagenet': 128, 'places': 128, 'cifar': 32, 'lsun': 64}
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser('Save a batch of ground truth train set images for evaluation')
     parser.add_argument('--cifar', action='store_true')
     parser.add_argument('--imagenet', action='store_true')
     parser.add_argument('--places', action='store_true')
+    parser.add_argument('--lsun', action='store_true')
     args = parser.parse_args()
 
     os.makedirs('output', exist_ok=True)
@@ -83,3 +100,6 @@ if __name__ == "__main__":
     if args.places:
         places_samples = get_gt_samples('places', nimgs=50000)
         np.savez('output/places_gt_imgs.npz', fake=places_samples, real=places_samples)
+    if args.lsun:
+        lsun_samples = get_gt_samples('lsun', nimgs=50000)
+        np.savez('output/lsun_gt_imgs.npz', fake=lsun_samples, real=lsun_samples)
