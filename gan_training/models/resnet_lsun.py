@@ -97,7 +97,7 @@ class Encoder(nn.Module):
         self.label_size = label_size
 
 
-        bn = blocks.Identity
+        bn = blocks.BatchNorm2d
 
         self.conv_img = nn.Conv2d(3, 1 * nf, 3, padding=1)
 
@@ -262,23 +262,23 @@ class LabelGenerator(nn.Module):
 
 
         #either use conditional batch norm, or use no batch norm
-        # bn = blocks.Identity
+        bn = blocks.BatchNorm2d
         # bn = blocks.BatchNorm2d
 
         self.modified = False
         if not self.modified:
             s0 = self.s0 = label_size // 4
-            self.fc = nn.Linear(z_dim, 8 * nf * s0 * s0)
-            self.resnet_0_0 = ResnetBlock(8 * nf, 8 * nf)
-            self.resnet_1_0 = ResnetBlock(8 * nf, 4 * nf)
+            self.fc = nn.Linear(z_dim, 8 * nf * s0 * s0,bn)
+            self.resnet_0_0 = ResnetBlock(8 * nf, 8 * nf,bn)
+            self.resnet_1_0 = ResnetBlock(8 * nf, 4 * nf,bn)
 
-            self.resnet_2_0 = ResnetBlock(4 * nf, 4 * nf)
-            self.resnet_4_0 = ResnetBlock(4 * nf, 2 * nf)
+            self.resnet_2_0 = ResnetBlock(4 * nf, 4 * nf,bn)
+            self.resnet_4_0 = ResnetBlock(4 * nf, 2 * nf,bn)
 
-            self.resnet_5_0 = ResnetBlock(2 * nf, 1 * nf)
+            self.resnet_5_0 = ResnetBlock(2 * nf, 1 * nf,bn)
 
         else:
-            s0 = self.s0 = label_size // 8
+            s0 = self.s0 = label_size // 4
             self.fc = nn.Linear(z_dim, 16 * nf * s0 * s0)
             self.resnet_0_0 = ResnetBlock(16 * nf, 16 * nf, bn = False)
             self.resnet_0_1 = ResnetBlock(16 * nf, 16 * nf, bn = False)
@@ -369,7 +369,7 @@ class BiGANDiscriminator(nn.Module):
         self.img_size = img_size
         self.label_size =label_size
 
-        bn = blocks.Identity
+        bn = blocks.BatchNorm2d
 
         #inference over x
         self.conv_img = nn.Conv2d(3, 1 * nf, 3, padding=1)
@@ -384,6 +384,28 @@ class BiGANDiscriminator(nn.Module):
         self.resnet_2_1_img = ResnetBlock(4 * nf, 8 * nf, bn)
 
         ndf = nf
+        self.conv1 = nn.Sequential(nn.Conv2d(3, ndf, 3, 1, 1),
+                                  nn.BatchNorm2d(ndf),
+                                  nn.LeakyReLU(0.2, inplace=True))
+
+        self.conv2 = nn.Sequential(nn.Conv2d(ndf, ndf, 4, 2, 1),
+                                      nn.BatchNorm2d(ndf),
+                                      nn.LeakyReLU(0.2, inplace=True))
+
+        self.conv3 = nn.Sequential(nn.Conv2d(ndf, ndf * 2, 3, 1, 1),
+                                      nn.BatchNorm2d(ndf * 2),
+                                      nn.LeakyReLU(0.2, inplace=True))
+
+        self.conv4 = nn.Sequential(nn.Conv2d(ndf * 2, ndf * 2, 4, 2, 1),
+                                      nn.BatchNorm2d(ndf * 2),
+                                      nn.LeakyReLU(0.2, inplace=True))
+
+        self.conv5 = nn.Sequential(nn.Conv2d(ndf * 2, ndf * 4, 3, 1, 1),
+                                      nn.BatchNorm2d(ndf * 4),
+                                      nn.LeakyReLU(0.2, inplace=True))
+        self.conv6 = nn.Sequential(nn.Conv2d(ndf * 4, ndf * 8, 3, 1, 1),
+                                   nn.BatchNorm2d(ndf * 8),
+                                   nn.LeakyReLU(0.2, inplace=True))
         #inference over seg
         self.conv1z = nn.Sequential(nn.Conv2d(self.local_nlabels, ndf * 2, 1, 1, padding=0, bias=False),
                                     nn.LeakyReLU(0.2, inplace=True))
@@ -398,33 +420,39 @@ class BiGANDiscriminator(nn.Module):
         # self.resnet_3_3_seg = ResnetBlock(4 * nf, 8 * nf, bn)
 
         #joint inference
-        self.resnet_4_0 = ResnetBlock(16 * nf, 16 * nf, bn=False, use_shortcut=True, is_bias=False)
-        self.resnet_4_1 = ResnetBlock(16 * nf, 16 * nf, bn=False, use_shortcut=True, is_bias=False)
+        # self.resnet_4_0 = ResnetBlock(16 * nf, 16 * nf, bn=blocks.Identity, use_shortcut=True, is_bias=False)
+        # self.resnet_4_1 = ResnetBlock(16 * nf, 16 * nf, bn=blocks.Identity, use_shortcut=True, is_bias=False)
         # self.conv1xz = nn.Sequential(nn.Conv2d(nf * 16, nf * 16, 1, stride=1, bias=False),
         #                              nn.LeakyReLU(0.2, inplace=True))
-        self.conv2xz = nn.Sequential(nn.Conv2d(nf * 16, 1, 1, stride=1, bias=False), nn.LeakyReLU(0.2, inplace=True))
-        self.fc_out_joint = blocks.LinearUnconditionalLogits(s0 * s0)
+        # self.conv2xz = nn.Sequential(nn.Conv2d(nf * 16, 1, 1, stride=1, bias=False), nn.LeakyReLU(0.2, inplace=True))
+        # self.fc_out_joint = blocks.LinearUnconditionalLogits(s0 * s0)
 
-        # self.conv1xz = nn.Sequential(nn.Conv2d(ndf * 16, ndf * 16, 1, stride=1, bias=False),
-        #                              nn.LeakyReLU(0.2, inplace=True))
-        # self.conv2xz = nn.Sequential(nn.Conv2d(ndf * 16, ndf * 16, 1, stride=1, bias=False), nn.LeakyReLU(0.2, inplace=True))
-        # self.conv3xz = nn.Sequential(nn.Conv2d(ndf * 16, 1, 1, stride=1, bias=False), nn.LeakyReLU(0.2, inplace=True))
-        # self.fc_out_joint = blocks.LinearUnconditionalLogits(8*8)
+        self.conv1xz = nn.Sequential(nn.Conv2d(ndf * 16, ndf * 16, 1, stride=1, bias=False),
+                                     nn.LeakyReLU(0.2, inplace=True))
+        self.conv2xz = nn.Sequential(nn.Conv2d(ndf * 16, ndf * 16, 1, stride=1, bias=False), nn.LeakyReLU(0.2, inplace=True))
+        self.conv3xz = nn.Sequential(nn.Conv2d(ndf * 16, 1, 1, stride=1, bias=False), nn.LeakyReLU(0.2, inplace=True))
+        self.fc_out_joint = blocks.LinearUnconditionalLogits(s0*s0)
 
 
     def inf_x(self,img):
-        out = self.conv_img(img)
-        out = self.resnet_0_0_img(out)
-        out = self.resnet_0_1_img(out)
-        out = F.avg_pool2d(out, 3, stride=2, padding=1)
-        out = self.resnet_1_0_img(out)
-        out = self.resnet_1_1_img(out)
-        out = F.avg_pool2d(out, 3, stride=2, padding=1)
-        out = self.resnet_2_0_img(out)
-        if self.img_size // self.label_size ==8:
-            out = F.avg_pool2d(out, 3, stride=2, padding=1)
-
-        out = self.resnet_2_1_img(out)
+        out = self.conv1(img)  # to try : with dropout as in initial bigan model
+        out = self.conv2(out)
+        out = self.conv3(out)
+        out = self.conv4(out)
+        out = self.conv5(out)
+        out = self.conv6(out)
+        # out = self.conv_img(img)
+        # out = self.resnet_0_0_img(out)
+        # out = self.resnet_0_1_img(out)
+        # out = F.avg_pool2d(out, 3, stride=2, padding=1)
+        # out = self.resnet_1_0_img(out)
+        # out = self.resnet_1_1_img(out)
+        # out = F.avg_pool2d(out, 3, stride=2, padding=1)
+        # out = self.resnet_2_0_img(out)
+        # if self.img_size // self.label_size ==8:
+        #     out = F.avg_pool2d(out, 3, stride=2, padding=1)
+        #
+        # out = self.resnet_2_1_img(out)
         return out
 
     def inf_seg(self, seg):
@@ -439,21 +467,21 @@ class BiGANDiscriminator(nn.Module):
         return out
 
     def inf_xseg(self,xseg):
-        out = self.resnet_4_0(xseg)
-        out = self.resnet_4_1(out)
-        # out = F.avg_pool2d(out, 3, stride=2, padding=1)
-
-        # out = self.conv1xz(out)
-        out = self.conv2xz(out)
-
-        out = out.view(out.size(0),-1)
-        out = self.fc_out_joint(out)
-
-        # out = self.conv1xz(xseg)
+        # out = self.resnet_4_0(xseg)
+        # out = self.resnet_4_1(out)
+        # # out = F.avg_pool2d(out, 3, stride=2, padding=1)
+        #
+        # # out = self.conv1xz(out)
         # out = self.conv2xz(out)
-        # out = self.conv3xz(out)
-        # out = out.view(out.size(0), -1)
+        #
+        # out = out.view(out.size(0),-1)
         # out = self.fc_out_joint(out)
+
+        out = self.conv1xz(xseg)
+        out = self.conv2xz(out)
+        out = self.conv3xz(out)
+        out = out.view(out.size(0), -1)
+        out = self.fc_out_joint(out)
         return out
 
     def forward(self, input, seg):
@@ -601,10 +629,20 @@ class BiGANQHeadDiscriminator(nn.Module):
         #
         # self.bn1 = nn.BatchNorm2d(512)
         if not qhead_variant:
-            self.resnet_0_0 = ResnetBlock(512, 256)
-            self.resnet_0_1 = ResnetBlock(256, 128)
-            self.conv2 = nn.Conv2d(128, 128, size, bias = False)
-            self.bn2 = nn.BatchNorm2d(128)
+            # bn=blocks.Identity
+            # self.resnet_0_0 = ResnetBlock(512, 256,bn = bn)
+            # self.resnet_0_1 = ResnetBlock(256, 128,bn = bn)
+            # self.conv2 = nn.Conv2d(128, 128, size, bias = False)
+            # self.bn2 = nn.BatchNorm2d(128)
+
+            self.conv2 = nn.Conv2d(512, 256, 3,1,1)
+            self.bn2 = nn.BatchNorm2d(256)
+            self.conv3 = nn.Conv2d(256, 128, 4,2,1)
+            self.bn3 = nn.BatchNorm2d(128)
+            self.conv4 = nn.Conv2d(128, 128,size//2 , bias = False )
+            self.bn4 = nn.BatchNorm2d(128)
+
+
             self.conv_mu = nn.Conv2d(128, z_dim, 1)
             self.conv_var = nn.Conv2d(128, z_dim, 1)
             print("2nd Qhead discriminator with variant")
@@ -626,9 +664,11 @@ class BiGANQHeadDiscriminator(nn.Module):
             x = F.leaky_relu(self.bn2(self.conv2(x)), 0.1, inplace=True)
             x = F.leaky_relu(self.bn3(self.conv3(x)), 0.1, inplace=True)
         else:
-            x = self.resnet_0_0(x)
-            x = self.resnet_0_1(x)
+            # x = self.resnet_0_0(x)
+            # x = self.resnet_0_1(x)
             x = F.leaky_relu(self.bn2(self.conv2(x)), 0.1, inplace=True)
+            x = F.leaky_relu(self.bn3(self.conv3(x)), 0.1, inplace=True)
+            x = F.leaky_relu(self.bn4(self.conv4(x)), 0.1, inplace=True)
         mu = self.conv_mu(x).squeeze()
         var = torch.exp(self.conv_var(x).squeeze())
         return mu, var

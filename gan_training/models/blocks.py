@@ -92,7 +92,7 @@ class ResnetBlock(nn.Module):
     def __init__(self,
                  fin,
                  fout,
-                 bn=True,
+                 bn,
                  use_shortcut=False,
                  fhidden=None,
                  is_bias=True):
@@ -125,12 +125,13 @@ class ResnetBlock(nn.Module):
                           padding=0,
                           bias=False)
             # self.conv_s = spectral_norm(self.conv_s)
-        if not bn:
-            self.bn0 = Identity(self.fin)
-            self.bn1 = Identity(self.fhidden)
-        else:
-            self.bn0 = BatchNorm2d(self.fin)
-            self.bn1 = BatchNorm2d(self.fhidden)
+        # if not bn:
+        #     self.bn0 = Identity(self.fin)
+        #     self.bn1 = Identity(self.fhidden)
+        # else:
+        print(bn)
+        self.bn0 = bn(self.fin)
+        self.bn1 = bn(self.fhidden)
 
 
     def forward(self, x):
