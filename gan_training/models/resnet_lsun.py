@@ -264,7 +264,7 @@ class LabelGenerator(nn.Module):
         #either use conditional batch norm, or use no batch norm
         bn = blocks.BatchNorm2d
         # bn = blocks.BatchNorm2d
-
+        print("INIT LABEL GENERATOR")
         self.modified = False
         if not self.modified:
             s0 = self.s0 = label_size // 4
@@ -372,16 +372,16 @@ class BiGANDiscriminator(nn.Module):
         bn = blocks.BatchNorm2d
 
         #inference over x
-        self.conv_img = nn.Conv2d(3, 1 * nf, 3, padding=1)
-
-        self.resnet_0_0_img = ResnetBlock(1 * nf, 1 * nf, bn)
-        self.resnet_0_1_img = ResnetBlock(1 * nf, 2 * nf, bn)
-
-        self.resnet_1_0_img = ResnetBlock(2 * nf, 2 * nf, bn)
-        self.resnet_1_1_img = ResnetBlock(2 * nf, 4 * nf, bn)
-
-        self.resnet_2_0_img = ResnetBlock(4 * nf, 4 * nf, bn)
-        self.resnet_2_1_img = ResnetBlock(4 * nf, 8 * nf, bn)
+        # self.conv_img = nn.Conv2d(3, 1 * nf, 3, padding=1)
+        #
+        # self.resnet_0_0_img = ResnetBlock(1 * nf, 1 * nf, bn)
+        # self.resnet_0_1_img = ResnetBlock(1 * nf, 2 * nf, bn)
+        #
+        # self.resnet_1_0_img = ResnetBlock(2 * nf, 2 * nf, bn)
+        # self.resnet_1_1_img = ResnetBlock(2 * nf, 4 * nf, bn)
+        #
+        # self.resnet_2_0_img = ResnetBlock(4 * nf, 4 * nf, bn)
+        # self.resnet_2_1_img = ResnetBlock(4 * nf, 8 * nf, bn)
 
         ndf = nf
         self.conv1 = nn.Sequential(nn.Conv2d(3, ndf, 3, 1, 1),
