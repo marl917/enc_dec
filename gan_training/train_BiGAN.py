@@ -53,6 +53,11 @@ class Trainer(object):
 
         return nll
 
+    def gaussian(self, ins, mean=0, stddev=0.1):
+        noise = Variable(ins.data.new(ins.size()).normal_(mean, stddev))
+        return ins + noise
+
+
     def encoderdecoder_trainstep(self, x_real, z, z_lab = None,check_norm = False):
         toggle_grad(self.decoder, True)
         toggle_grad(self.encoder, True)

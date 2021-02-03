@@ -8,6 +8,8 @@ encoder:
 discriminator:
   nlabels: 1
   n_locallabels: 10
+  kwargs:
+    qhead_variant: False
 label_generator:
   label_size: 16
   nlabels: 1
@@ -15,6 +17,6 @@ label_generator:
   conditioning: unconditional
 inherit_from: configs/lsun/default.yaml
 training:
-  out_dir: output/lsun/selfcondgan_labelRes16_modArchi
+  out_dir: output/lsun/selfcondgan_labelRes16_modArchi_anotherQheadVar
   reg_param: 0.1
   con_loss: True

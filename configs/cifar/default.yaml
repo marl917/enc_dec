@@ -37,4 +37,4 @@ training:
   sample_nlabels: 20
   log_every: 1000
   inception_every: 10000
-  batch_size: 64
+  batch_size: 128

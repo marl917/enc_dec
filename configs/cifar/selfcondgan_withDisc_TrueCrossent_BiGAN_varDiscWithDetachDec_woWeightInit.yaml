@@ -27,6 +27,6 @@ label_discriminator:
   conditioning: unconditional
 inherit_from: configs/cifar/default.yaml
 training:
-  out_dir: output/cifar/K2_10_withDisc_BiGAN_detOnSeg_CONLOSSIMG_ImgSeg_detach
+  out_dir: output/cifar/K2_10_withDisc_BiGAN_detOnSeg_CONLOSSIMG_ImgSeg_detach_bs128
   use_disc: True
   con_loss: True

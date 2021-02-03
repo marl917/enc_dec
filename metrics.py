@@ -129,7 +129,7 @@ while len(dirs) > 0:
 
 
                     #  don't save samples for each iteration for disk space
-                    samples_path = os.path.join(outdir, 'results', 'samples.npz')
+                    samples_path = os.path.join(outdir, file, 'samples.npz')
 
                     targets = []
                     if args.inception:

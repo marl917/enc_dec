@@ -252,29 +252,50 @@ class LabelGenerator(nn.Module):
                  nfilter=64,
                  **kwargs):
         super(LabelGenerator, self).__init__()
-        s0 = self.s0 = label_size // 4
+
         print(label_size)
         nf = self.nf = nfilter
         self.nlabels = nlabels
         self.z_dim = z_dim
         self.local_nlabels = local_nlabels
 
-        self.fc = nn.Linear(z_dim, 8 * nf * s0 * s0)
+
 
         #either use conditional batch norm, or use no batch norm
         # bn = blocks.Identity
         # bn = blocks.BatchNorm2d
 
-        bn = spectral_norm
-        self.resnet_0_0 = ResnetBlock(8 * nf, 8 * nf, bn)
+        self.modified = False
+        if not self.modified:
+            s0 = self.s0 = label_size // 4
+            self.fc = nn.Linear(z_dim, 8 * nf * s0 * s0)
+            self.resnet_0_0 = ResnetBlock(8 * nf, 8 * nf)
+            self.resnet_1_0 = ResnetBlock(8 * nf, 4 * nf)
 
-        self.resnet_1_0 = ResnetBlock(8 * nf, 4 * nf, bn)
+            self.resnet_2_0 = ResnetBlock(4 * nf, 4 * nf)
+            self.resnet_4_0 = ResnetBlock(4 * nf, 2 * nf)
 
-        self.resnet_2_0 = ResnetBlock(4 * nf, 4 * nf, bn)
+            self.resnet_5_0 = ResnetBlock(2 * nf, 1 * nf)
 
-        self.resnet_4_0 = ResnetBlock(4 * nf, 2 * nf, bn)
+        else:
+            s0 = self.s0 = label_size // 8
+            self.fc = nn.Linear(z_dim, 16 * nf * s0 * s0)
+            self.resnet_0_0 = ResnetBlock(16 * nf, 16 * nf, bn = False)
+            self.resnet_0_1 = ResnetBlock(16 * nf, 16 * nf, bn = False)
 
-        self.resnet_5_0 = ResnetBlock(2 * nf, 1 * nf, bn)
+            self.resnet_1_0 = ResnetBlock(16 * nf, 8 * nf, bn = False)
+            self.resnet_1_1 = ResnetBlock(8 * nf, 8 * nf, bn = False)
+
+            self.resnet_2_0 = ResnetBlock(8 * nf, 4 * nf, bn = False)
+            self.resnet_2_1 = ResnetBlock(4 * nf, 4 * nf, bn = False)
+
+            self.resnet_3_0 = ResnetBlock(4 * nf, 2* nf, bn = False)
+            self.resnet_3_1 = ResnetBlock(2 * nf, 2 * nf, bn = False)
+
+            self.resnet_4_0 = ResnetBlock(2 * nf, 1 * nf, bn = False)
+            self.resnet_4_1 = ResnetBlock(1 * nf, 1 * nf, bn = False)
+
+
 
         self.conv_img = nn.Sequential(nn.Conv2d(nf, self.local_nlabels, 3, padding = 1), nn.LogSoftmax(dim=1))
 
@@ -299,15 +320,33 @@ class LabelGenerator(nn.Module):
 
     def forward(self, z):
         out = self.fc(z)
-        out = out.view(z.size(0), 8 * self.nf, self.s0, self.s0)
-        out = self.resnet_0_0(out)
-        out = self.resnet_1_0(out)
-        out = F.interpolate(out, scale_factor=2)
-        out = self.resnet_2_0(out)
-        out = self.resnet_4_0(out)
-        out = F.interpolate(out, scale_factor=2)
-        out = actvn(self.resnet_5_0(out))
+        if not self.modified:
+            out = out.view(z.size(0), 8 * self.nf, self.s0, self.s0)
+            out = self.resnet_0_0(out)
+            out = self.resnet_1_0(out)
+            out = F.interpolate(out, scale_factor=2)
+            out = self.resnet_2_0(out)
+            out = self.resnet_4_0(out)
+            out = F.interpolate(out, scale_factor=2)
+            out = actvn(self.resnet_5_0(out))
 
+        else:
+            out = out.view(z.size(0), 8 * self.nf, self.s0, self.s0)
+            out = self.resnet_0_0(out)
+            out = self.resnet_0_1(out)
+            out = F.interpolate(out, scale_factor=2)
+            out = self.resnet_1_0(out)
+            out = self.resnet_1_2(out)
+            out = F.interpolate(out, scale_factor=2)
+            out = self.resnet_2_0(out)
+            out = self.resnet_2_1(out)
+            out = F.interpolate(out, scale_factor=2)
+            out = self.resnet_3_0(out)
+            out = self.resnet_3_1(out)
+
+            out = self.resnet_4_0(out)
+            out = self.resnet_4_1(out)
+            out = actvn(self.resnet_5_0(out))
         logits = self.conv_img(out)
         label_map, y_unorm = self.gumble_softmax(logits)
 
@@ -561,17 +600,20 @@ class BiGANQHeadDiscriminator(nn.Module):
         # self.conv1 = nn.Conv2d(ndf *16, 512, 8, bias=False)
         #
         # self.bn1 = nn.BatchNorm2d(512)
-        self.conv2 = nn.Conv2d(512, 256, size, bias=False)
-        self.bn2 = nn.BatchNorm2d(256)
-        if qhead_variant:
+        if not qhead_variant:
+            self.resnet_0_0 = ResnetBlock(512, 256)
+            self.resnet_0_1 = ResnetBlock(256, 128)
+            self.conv2 = nn.Conv2d(128, 128, size, bias = False)
+            self.bn2 = nn.BatchNorm2d(128)
+            self.conv_mu = nn.Conv2d(128, z_dim, 1)
+            self.conv_var = nn.Conv2d(128, z_dim, 1)
+            print("2nd Qhead discriminator with variant")
+        else:
+            self.conv2 = nn.Conv2d(512, 256, 3, 1, 1)
+            self.bn2 = nn.BatchNorm2d(256)
             self.conv3 = nn.Conv2d(256, 256, size, bias=False)
             self.bn3 = nn.BatchNorm2d(256)
             print("Qhead discriminator with variant")
-            self.conv4 = nn.Conv2d(256, 128, size, bias=False)
-            self.bn4 = nn.BatchNorm2d(128)
-            self.conv_mu = nn.Conv2d(128, z_dim, 1)
-            self.conv_var = nn.Conv2d(128, z_dim, 1)
-        else:
             self.conv_mu = nn.Conv2d(256, z_dim, 1)
             self.conv_var = nn.Conv2d(256, z_dim, 1)
 
@@ -579,10 +621,14 @@ class BiGANQHeadDiscriminator(nn.Module):
 
     def forward(self,x):
         # x = F.leaky_relu(self.bn1(self.conv1(x)), 0.1, inplace=True)
-        x = F.leaky_relu(self.bn2(self.conv2(x)), 0.1, inplace=True)
+
         if self.qhead_variant:
+            x = F.leaky_relu(self.bn2(self.conv2(x)), 0.1, inplace=True)
             x = F.leaky_relu(self.bn3(self.conv3(x)), 0.1, inplace=True)
-            x = F.leaky_relu(self.bn4(self.conv4(x)), 0.1, inplace=True)
+        else:
+            x = self.resnet_0_0(x)
+            x = self.resnet_0_1(x)
+            x = F.leaky_relu(self.bn2(self.conv2(x)), 0.1, inplace=True)
         mu = self.conv_mu(x).squeeze()
         var = torch.exp(self.conv_var(x).squeeze())
         return mu, var
