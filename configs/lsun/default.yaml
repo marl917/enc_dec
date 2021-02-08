@@ -38,4 +38,4 @@ training:
   inception_every: 10000
   backup_every: 2000
   batch_size: 128
-  sample_every: 100
+  sample_every: 500
