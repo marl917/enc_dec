@@ -34,7 +34,6 @@ class Evaluator(object):
 
         self.cmap = self.labelcolormap(self.n_locallabels)
         self.cmap = torch.from_numpy(self.cmap[:self.n_locallabels])
-        print(self.cmap)
 
     def uint82bin(self, n, count=8):
         """returns the binary of integer n, count refers to amount of bits"""
@@ -124,6 +123,9 @@ class Evaluator(object):
 
             x_fake1 = self.decoder(seg = label_map, input=z)
 
+            count = torch.bincount(torch.argmax(label_map, dim=1).view(-1), minlength=self.n_locallabels)
+            print("occurence on label maps for gen label maps for each classes", count)
+
             # z_Bis = self.sample_z(z.size(0))
             # x_fake2 = self.decoder(seg = label_map, input = z_Bis)
             # print('range in labelGen sample', torch.min(x_fake), torch.max(x_fake), x_fake.size())
@@ -152,6 +154,9 @@ class Evaluator(object):
             x_fake = self.decoder(seg = label_map, input = z)
             print("min max of fake img : ", torch.min(x_fake), torch.max(x_fake))
             color_lab_map = self.create_colormap(label_map)
+
+            count = torch.bincount(torch.argmax(label_map, dim = 1).view(-1), minlength=self.n_locallabels)
+            print("occurence on label maps from dataset img for each classes", count)
             # print("color_label map", color_lab_map)
             # z_real = self.encoder(x_real)
             # z_real = z_real.view(x_real.size(0), -1)
