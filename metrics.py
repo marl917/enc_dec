@@ -166,3 +166,5 @@ while len(dirs) > 0:
                     if args.fsd and it not in fsd_results:
                         gt_path = dataset_to_img[dataset_name]
                         os.system(f'CUDA_VISIBLE_DEVICES={device} python -m seeing.fsd {gt_path} {samples_path} --it {it} --results_dir {results_dir}')
+                    if args.lpips:
+                        os.system(f'CUDA_VISIBLE_DEVICES={device} python gan_training/metrics/lpips.py {arguments}')

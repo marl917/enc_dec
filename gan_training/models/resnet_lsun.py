@@ -54,7 +54,7 @@ class Decoder(nn.Module):
             out = F.interpolate(seg, size=(self.sh, self.sw))
             out = self.fc(out)
         else:
-            out = self.get_latent(input, y)
+            out = self.get_latent(input)
             # print("out size in decoder : ", out.size())
             out = self.fc(out)
             out = out.view(out.size(0), -1, self.sh, self.sw)
@@ -86,6 +86,7 @@ class Encoder(nn.Module):
                  label_size =0,
                  nfilter=64,
                  features='penultimate',
+                 deeper_arch=False,
                  **kwargs):
         super(Encoder, self).__init__()
         # s0 = self.s0 = img_size // 32
@@ -95,7 +96,7 @@ class Encoder(nn.Module):
         self.local_nlabels = local_nlabels
         self.img_size =img_size
         self.label_size = label_size
-
+        self.modified = deeper_arch
 
         bn = blocks.BatchNorm2d
 
@@ -115,9 +116,11 @@ class Encoder(nn.Module):
 
         self.resnet_4_0 = ResnetBlock(16 * nf, 16 * nf, bn)
         self.resnet_4_1 = ResnetBlock(16 * nf, 16 * nf, bn)
-        #
-        # self.resnet_5_0 = ResnetBlock(16 * nf, 16 * nf, bn, nlabels)
-        # self.resnet_5_1 = ResnetBlock(16 * nf, 16 * nf, bn, nlabels)
+
+        if self.modified:
+            print("Deeper archi for Encoder")
+            self.resnet_5_0 = ResnetBlock(16 * nf, 16 * nf, bn)
+            self.resnet_5_1 = ResnetBlock(16 * nf, 16 * nf, bn)
 
         # self.local_FeatureMapping = blocks.Classifier_Module(dilation_series = [3,6,9,12], padding_series = [3,6,9,12], num_classes=self.local_nlabels,
         #                                                         n_input_channels=nf * 16)  # modified : remove dilatation
@@ -166,6 +169,10 @@ class Encoder(nn.Module):
 
         out = self.resnet_4_0(out)
         out = self.resnet_4_1(out)
+
+        if self.modified:
+            out = self.resnet_5_0(out)
+            out = self.resnet_5_1(out)
         out = actvn(out)
         out = self.local_FeatureMapping(out)
 
@@ -331,6 +338,7 @@ class LabelGenerator(nn.Module):
                  local_nlabels=0,
                  conditioning=None,
                  nfilter=64,
+                 deeper_arch=False,
                  **kwargs):
         super(LabelGenerator, self).__init__()
 
@@ -346,7 +354,7 @@ class LabelGenerator(nn.Module):
         bn = blocks.BatchNorm2d
         # bn = blocks.BatchNorm2d
         print("INIT LABEL GENERATOR")
-        self.modified = False
+        self.modified = deeper_arch
         if not self.modified:
             s0 = self.s0 = label_size // 4
             self.fc = nn.Linear(z_dim, 8 * nf * s0 * s0,bn)
@@ -359,22 +367,26 @@ class LabelGenerator(nn.Module):
             self.resnet_5_0 = ResnetBlock(2 * nf, 1 * nf,bn)
 
         else:
-            s0 = self.s0 = label_size // 4
+            print("deeper archi for label generator")
+            s0 = self.s0 = label_size // 8
             self.fc = nn.Linear(z_dim, 16 * nf * s0 * s0)
-            self.resnet_0_0 = ResnetBlock(16 * nf, 16 * nf, bn = False)
-            self.resnet_0_1 = ResnetBlock(16 * nf, 16 * nf, bn = False)
+            self.resnet_0_0 = ResnetBlock(16 * nf, 16 * nf, bn )
+            self.resnet_0_1 = ResnetBlock(16 * nf, 16 * nf, bn)
 
-            self.resnet_1_0 = ResnetBlock(16 * nf, 8 * nf, bn = False)
-            self.resnet_1_1 = ResnetBlock(8 * nf, 8 * nf, bn = False)
+            self.resnet_0_2 = ResnetBlock(16 * nf, 16 * nf, bn)
+            self.resnet_0_3 = ResnetBlock(16 * nf, 16 * nf, bn)
 
-            self.resnet_2_0 = ResnetBlock(8 * nf, 4 * nf, bn = False)
-            self.resnet_2_1 = ResnetBlock(4 * nf, 4 * nf, bn = False)
+            self.resnet_1_0 = ResnetBlock(16 * nf, 8 * nf, bn)
+            self.resnet_1_1 = ResnetBlock(8 * nf, 8 * nf, bn )
 
-            self.resnet_3_0 = ResnetBlock(4 * nf, 2* nf, bn = False)
-            self.resnet_3_1 = ResnetBlock(2 * nf, 2 * nf, bn = False)
+            self.resnet_2_0 = ResnetBlock(8 * nf, 4 * nf, bn )
+            self.resnet_2_1 = ResnetBlock(4 * nf, 4 * nf, bn )
 
-            self.resnet_4_0 = ResnetBlock(2 * nf, 1 * nf, bn = False)
-            self.resnet_4_1 = ResnetBlock(1 * nf, 1 * nf, bn = False)
+            self.resnet_3_0 = ResnetBlock(4 * nf, 2* nf, bn )
+            self.resnet_3_1 = ResnetBlock(2 * nf, 2 * nf, bn )
+
+            self.resnet_4_0 = ResnetBlock(2 * nf, 1 * nf, bn)
+            self.resnet_4_1 = ResnetBlock(1 * nf, 1 * nf, bn)
 
 
 
@@ -412,12 +424,15 @@ class LabelGenerator(nn.Module):
             out = actvn(self.resnet_5_0(out))
 
         else:
-            out = out.view(z.size(0), 8 * self.nf, self.s0, self.s0)
+            out = out.view(z.size(0), 16 * self.nf, self.s0, self.s0)
             out = self.resnet_0_0(out)
             out = self.resnet_0_1(out)
             out = F.interpolate(out, scale_factor=2)
+            out = self.resnet_0_2(out)
+            out = self.resnet_0_3(out)
+
             out = self.resnet_1_0(out)
-            out = self.resnet_1_2(out)
+            out = self.resnet_1_1(out)
             out = F.interpolate(out, scale_factor=2)
             out = self.resnet_2_0(out)
             out = self.resnet_2_1(out)
@@ -426,11 +441,10 @@ class LabelGenerator(nn.Module):
             out = self.resnet_3_1(out)
 
             out = self.resnet_4_0(out)
-            out = self.resnet_4_1(out)
-            out = actvn(self.resnet_5_0(out))
+            out = actvn(self.resnet_4_1(out))
         logits = self.conv_img(out)
         label_map, y_unorm = self.gumble_softmax(logits)
-
+        # print("size of label map :", label_map.size())
         return y_unorm, label_map
 
 class BiGANDiscriminator(nn.Module):
@@ -695,12 +709,12 @@ class BiGANQHeadDiscriminator(nn.Module):
                  nlabels,
                  local_nlabels=None,
                  size=None,
-                 z_dim=1,
+                 z_dim_lab=1,
+                 z_dim_img=1,
                  qhead_variant=False,
                  ndf=64,
                  **kwargs):
         super(BiGANQHeadDiscriminator, self).__init__()
-        print("z_dim in qhead disc :", z_dim)
         self.ndf = ndf
         self.nlabels = nlabels
         self.local_nlabels = local_nlabels
@@ -724,17 +738,38 @@ class BiGANQHeadDiscriminator(nn.Module):
             self.bn4 = nn.BatchNorm2d(128)
 
 
-            self.conv_mu = nn.Conv2d(128, z_dim, 1)
-            self.conv_var = nn.Conv2d(128, z_dim, 1)
-            print("2nd Qhead discriminator with variant")
+            self.conv_mu = nn.Conv2d(128, z_dim_lab, 1)
+            self.conv_var = nn.Conv2d(128, z_dim_lab, 1)
+            print("2nd Qhead discriminator with only label map z to recover")
         else:
-            self.conv2 = nn.Conv2d(512, 256, 3, 1, 1)
-            self.bn2 = nn.BatchNorm2d(256)
-            self.conv3 = nn.Conv2d(256, 256, size, bias=False)
-            self.bn3 = nn.BatchNorm2d(256)
-            print("Qhead discriminator with variant")
-            self.conv_mu = nn.Conv2d(256, z_dim, 1)
-            self.conv_var = nn.Conv2d(256, z_dim, 1)
+            self.conv2_lab = nn.Conv2d(512, 256, 3, 1, 1)
+            self.bn2_lab = nn.BatchNorm2d(256)
+            self.conv3_lab = nn.Conv2d(256, 128, 4, 2, 1)
+            self.bn3_lab = nn.BatchNorm2d(128)
+            self.conv4_lab = nn.Conv2d(128, 128, size // 2, bias=False)
+            self.bn4_lab = nn.BatchNorm2d(128)
+
+            self.conv_mu_lab = nn.Conv2d(128, z_dim_lab, 1)
+            self.conv_var_lab = nn.Conv2d(128, z_dim_lab, 1)
+
+            self.conv2_img = nn.Conv2d(512, 256, 3, 1, 1)
+            self.bn2_img = nn.BatchNorm2d(256)
+            self.conv3_img = nn.Conv2d(256, 128, 4, 2, 1)
+            self.bn3_img = nn.BatchNorm2d(128)
+            self.conv4_img = nn.Conv2d(128, 128, size // 2, bias=False)
+            self.bn4_img = nn.BatchNorm2d(128)
+
+            self.conv_mu_img = nn.Conv2d(128, z_dim_img, 1)
+            self.conv_var_img = nn.Conv2d(128, z_dim_img, 1)
+            print("2nd Qhead discriminator with label map and img z to recover", "z_dim_img : ", z_dim_img, "z_dim_lab", z_dim_lab)
+
+            # self.conv2 = nn.Conv2d(512, 256, 3, 1, 1)
+            # self.bn2 = nn.BatchNorm2d(256)
+            # self.conv3 = nn.Conv2d(256, 256, size, bias=False)
+            # self.bn3 = nn.BatchNorm2d(256)
+            # print("Qhead discriminator with variant")
+            # self.conv_mu = nn.Conv2d(256, z_dim, 1)
+            # self.conv_var = nn.Conv2d(256, z_dim, 1)
 
 
 
@@ -742,17 +777,29 @@ class BiGANQHeadDiscriminator(nn.Module):
         # x = F.leaky_relu(self.bn1(self.conv1(x)), 0.1, inplace=True)
 
         if self.qhead_variant:
-            x = F.leaky_relu(self.bn2(self.conv2(x)), 0.1, inplace=True)
-            x = F.leaky_relu(self.bn3(self.conv3(x)), 0.1, inplace=True)
+            x_lab = F.leaky_relu(self.bn2_lab(self.conv2_lab(x)), 0.1, inplace=True)
+            x_lab = F.leaky_relu(self.bn3_lab(self.conv3_lab(x_lab)), 0.1, inplace=True)
+            x_lab = F.leaky_relu(self.bn4_lab(self.conv4_lab(x_lab)), 0.1, inplace=True)
+            mu_lab = self.conv_mu_lab(x_lab).squeeze()
+            var_lab = torch.exp(self.conv_var_lab(x_lab).squeeze())
+
+            x_img = F.leaky_relu(self.bn2_img(self.conv2_img(x)), 0.1, inplace=True)
+            x_img = F.leaky_relu(self.bn3_img(self.conv3_img(x_img)), 0.1, inplace=True)
+            x_img = F.leaky_relu(self.bn4_img(self.conv4_img(x_img)), 0.1, inplace=True)
+            mu_img = self.conv_mu_img(x_img).squeeze()
+            var_img = torch.exp(self.conv_var_img(x_img).squeeze())
+
+            return mu_lab, var_lab, mu_img, var_img
+
         else:
             # x = self.resnet_0_0(x)
             # x = self.resnet_0_1(x)
             x = F.leaky_relu(self.bn2(self.conv2(x)), 0.1, inplace=True)
             x = F.leaky_relu(self.bn3(self.conv3(x)), 0.1, inplace=True)
             x = F.leaky_relu(self.bn4(self.conv4(x)), 0.1, inplace=True)
-        mu = self.conv_mu(x).squeeze()
-        var = torch.exp(self.conv_var(x).squeeze())
-        return mu, var
+            mu = self.conv_mu(x).squeeze()
+            var = torch.exp(self.conv_var(x).squeeze())
+            return mu, var
 
 def actvn(x):
     out = F.leaky_relu(x, 2e-1)

@@ -98,10 +98,12 @@ def build_models(config):
 
 
     Qhead_discriminator = qhead_discriminator_dict[config['discriminator']['name']]
-    qhead_discriminator = Qhead_discriminator(z_dim=config['label_generator']['zdim'],
+    qhead_discriminator = Qhead_discriminator(z_dim_lab=config['label_generator']['zdim'],
+                                              z_dim_img = config['z_dist']['dim'],
                   nlabels=config['discriminator']['nlabels'],
                   local_nlabels=config['discriminator']['n_locallabels'],
                   size=config['label_generator']['label_size'],
+                  qhead_variant = not config['decoder']['deterministicOnSeg'],
                   **config['discriminator']['kwargs'])
 
     return decoder, encoder, discriminator, label_generator, qhead_discriminator

@@ -25,7 +25,7 @@ class Trainer(object):
                  enc_optimizer=None,
                  dec_optimizer=None,
                  label_gen_optimizer = None,
-
+                 decDeterministic = False,
                  con_loss = False):
 
         self.decoder = decoder
@@ -42,7 +42,7 @@ class Trainer(object):
         self.gan_type = gan_type
 
         self.con_loss = con_loss
-
+        self.decDeterministic = decDeterministic
         print("TRAINING WITH CON LOSS : ", con_loss)
 
 
@@ -88,10 +88,20 @@ class Trainer(object):
         # print("x_real max min : ", torch.min(x_real), torch.max(x_real))
         g_fake = self.discriminator(x_fake,  seg=seg_fake)
 
-        con_loss = torch.tensor(0., device='cuda')
+
+        con_loss_lab = torch.tensor(0., device='cuda')
+        con_loss_img = torch.tensor(0., device='cuda')
         if self.con_loss:
-            mu, var = self.qhead_discriminator(g_fake[0])
-            con_loss = self.normalNLLLoss(z_lab,mu,var) * 0.1
+            if self.decDeterministic:
+                mu, var = self.qhead_discriminator(g_fake[0])
+                con_loss_lab = self.normalNLLLoss(z_lab,mu,var) * 0.1
+                G_losses['con_loss_lab'] = con_loss_lab.item()
+            else:
+                mu_lab, var_lab, mu_img, var_img = self.qhead_discriminator(g_fake[0])
+                con_loss_lab = self.normalNLLLoss(z_lab, mu_lab, var_lab) * 1
+                con_loss_img = self.normalNLLLoss(z, mu_img, var_img) * 0.1
+                G_losses['con_loss_img'] = con_loss_img.item()
+                G_losses['con_loss_lab'] = con_loss_lab.item()
             # print("mu and var max min", torch.min(var), torch.max(var))
         #second part : train encoder
 
@@ -105,9 +115,9 @@ class Trainer(object):
             gloss = self.compute_loss(g_fake[1], 1) + self.compute_loss(g_real_enc[1], 0)
 
         G_losses['gloss'] = gloss.item()
-        G_losses['con_loss'] = con_loss.item()
 
-        tot_loss = (gloss + con_loss).mean()
+
+        tot_loss = (gloss + con_loss_lab + con_loss_img).mean()
         tot_loss.backward()
 
         # for p in self.encoder.parameters():

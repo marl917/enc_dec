@@ -1,22 +1,27 @@
 decoder:
-  deterministicOnSeg: True
+  deterministicOnSeg: False
   nlabels: 1
   n_locallabels: 10
+z_dist:
+  type: uniform
+  dim: 50
 encoder:
   nlabels: 1
   n_locallabels: 10
+  kwargs:
+    deeper_arch: True
 discriminator:
   nlabels: 1
   n_locallabels: 10
-  kwargs:
-    qhead_variant: False
 label_generator:
   label_size: 16
   nlabels: 1
   n_locallabels: 10
   conditioning: unconditional
+  kwargs:
+    deeper_arch: True
 inherit_from: configs/lsun/default.yaml
 training:
-  out_dir: output/lsun/selfcondgan_labelRes16_modArchi_anotherQheadVar
+  out_dir: output/lsun/selfcondgan_labelRes16_modArchi_DCGANDisc_deeperarch
   reg_param: 0.1
   con_loss: True

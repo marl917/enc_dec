@@ -12,6 +12,7 @@ from torch import nn
 from torch.nn import init
 
 from gan_training import utils
+
 from gan_training.train_BiGAN import Trainer
 from gan_training.logger import Logger
 from gan_training.checkpoints import CheckpointIO
@@ -251,7 +252,8 @@ def main():
                       dec_optimizer=dec_optimizer,
                       label_gen_optimizer=label_gen_optimizer,
                       gan_type=config['training']['gan_type'],
-                      con_loss = config['training']['con_loss'] if 'con_loss' in config['training'] else False)
+                      con_loss = config['training']['con_loss'] if 'con_loss' in config['training'] else False,
+                      decDeterministic = config['decoder']['deterministicOnSeg'])
 
 
     # Training loop
@@ -283,7 +285,7 @@ def main():
                 print(dloss)
 
             # (i) Sample if necessary
-            if it % config['training']['sample_every'] == 0 or True :
+            if it % config['training']['sample_every'] == 0:
                 print("it", it)
                 print('Creating samples...')
 
