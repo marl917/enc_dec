@@ -13,6 +13,7 @@ encoder:
 discriminator:
   nlabels: 1
   n_locallabels: 50
+
 label_generator:
   label_size: 16
   nlabels: 1
@@ -25,3 +26,4 @@ training:
   out_dir: output/lsun/selfcondgan_labelRes16_modArchi_DCGANDisc_deeperarch_K_50
   reg_param: 0.1
   con_loss: True
+  lambda_LabConLoss: 1.

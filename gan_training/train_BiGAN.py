@@ -26,7 +26,8 @@ class Trainer(object):
                  dec_optimizer=None,
                  label_gen_optimizer = None,
                  decDeterministic = False,
-                 con_loss = False):
+                 con_loss = False,
+                 lambda_LabConLoss=1):
 
         self.decoder = decoder
         self.encoder = encoder
@@ -38,6 +39,8 @@ class Trainer(object):
         self.enc_optimizer = enc_optimizer
         self.dec_optimizer = dec_optimizer
         self.label_gen_optimizer = label_gen_optimizer
+
+        self.lambda_LabConLoss = lambda_LabConLoss
 
         self.gan_type = gan_type
 
@@ -98,7 +101,7 @@ class Trainer(object):
                 G_losses['con_loss_lab'] = con_loss_lab.item()
             else:
                 mu_lab, var_lab, mu_img, var_img = self.qhead_discriminator(g_fake[0])
-                con_loss_lab = self.normalNLLLoss(z_lab, mu_lab, var_lab) * 1
+                con_loss_lab = self.normalNLLLoss(z_lab, mu_lab, var_lab) * self.lambda_LabConLoss
                 con_loss_img = self.normalNLLLoss(z, mu_img, var_img) * 0.1
                 G_losses['con_loss_img'] = con_loss_img.item()
                 G_losses['con_loss_lab'] = con_loss_lab.item()
