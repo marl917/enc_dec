@@ -23,6 +23,7 @@ from gan_training.config import (load_config, build_models, build_optimizers)
 from seeing.pidfile import exit_if_job_done, mark_job_done
 
 import torchvision.transforms as transforms
+from torch.nn import functional as F
 
 torch.backends.cudnn.benchmark = True
 
@@ -237,7 +238,8 @@ def main():
         train_loader=train_loader,
         batch_size=batch_size,
         device=device,
-        inception_nsamples=config['training']['inception_nsamples'])
+        inception_nsamples=config['training']['inception_nsamples'],
+    n_locallabels=config['encoder']['n_locallabels'])
 
     # Trainer
     # print(label_discriminator)
@@ -289,12 +291,15 @@ def main():
                 print("it", it)
                 print('Creating samples...')
 
-                x = evaluator.create_samples(x_test, z_test)
+                x, lab_color = evaluator.create_samples(x_test, z_test)
+                lab_color = F.interpolate(lab_color.float(), size=x.size()[2:], mode='bilinear', align_corners=True)
                 logger.add_imgs(x, 'all', it)
+                logger.add_imgs(lab_color, 'all', it+2)
 
                 z_lab = zdist_lab.sample((ntest,))
                 x = evaluator.create_samples_labelGen(z_test, z_lab, out_dir=out_dir)
                 logger.add_imgs(x, 'all', it+1)
+
 
 
             # (ii) Compute inception if necessary

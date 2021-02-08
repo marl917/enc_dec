@@ -36,6 +36,6 @@ training:
   sample_nlabels: 500
   log_every: 500
   inception_every: 10000
-  backup_every: 2000
+  backup_every: 5000
   batch_size: 128
   sample_every: 500
