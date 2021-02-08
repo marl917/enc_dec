@@ -34,7 +34,7 @@ training:
   take_model_average: false
   model_average_beta: 0.999
   sample_nlabels: 500
-  log_every: 100
+  log_every: 500
   inception_every: 10000
   backup_every: 2000
   batch_size: 128
