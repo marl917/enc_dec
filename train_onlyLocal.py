@@ -177,7 +177,6 @@ def main():
                                    label_gen_optimizer = label_gen_optimizer
                                    )
 
-
     # Logger
     logger = Logger(log_dir=path.join(out_dir, 'logs'),
                     img_dir=path.join(out_dir, 'imgs'),
@@ -292,6 +291,7 @@ def main():
                 print("it", it)
                 print('Creating samples...')
 
+                z_test = zdist.sample((ntest,))
                 x, lab_color = evaluator.create_samples(x_test, z_test)
                 lab_color = F.interpolate(lab_color.float(), size=x.size()[2:], mode='bilinear', align_corners=True)
                 logger.add_imgs(x, 'all', it)

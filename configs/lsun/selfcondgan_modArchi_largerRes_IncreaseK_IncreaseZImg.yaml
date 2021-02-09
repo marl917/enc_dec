@@ -1,29 +1,29 @@
 decoder:
   deterministicOnSeg: False
   nlabels: 1
-  n_locallabels: 15
+  n_locallabels: 25
 z_dist:
   type: uniform
-  dim: 5
+  dim: 10
 encoder:
   nlabels: 1
-  n_locallabels: 15
+  n_locallabels: 25
   kwargs:
     deeper_arch: False
 discriminator:
   nlabels: 1
-  n_locallabels: 15
+  n_locallabels: 25
 label_generator:
-  zdim: 50
+  zdim: 85
   label_size: 16
   nlabels: 1
-  n_locallabels: 15
+  n_locallabels: 25
   conditioning: unconditional
   kwargs:
     deeper_arch: False
 inherit_from: configs/lsun/default.yaml
 training:
-  out_dir: output/lsun/selfcondgan_labelRes16_DCGANDisc_K_15_lambda0.1_ZImg5_ZLab50
+  out_dir: output/lsun/selfcondgan_labelRes16_DCGANDisc_K_25_lambda0.1_ZImg10_ZLab85
   reg_param: 0.1
   con_loss: True
   lambda_LabConLoss: 0.1
