@@ -15,6 +15,7 @@ parser.add_argument('--it', type=int, default=-1, help='If set, computes numbers
 parser.add_argument('--it_lab', type=int, default=-1, help='If set, computes numbers only for that iteration of label generation')
 parser.add_argument('--every', type=int, default=-1, help='skips some checkpoints and only computes those whose iteration number are divisible by every')
 parser.add_argument('--fid', action='store_true', help='compute FID metric')
+parser.add_argument('--lpips', action='store_true', help='compute lpips similarity')
 parser.add_argument('--inception', action='store_true', help='compute IS metric')
 parser.add_argument('--modes', action='store_true', help='compute # modes and reverse-KL metric')
 parser.add_argument('--fsd', action='store_true', help='compute FSD metric')
@@ -141,18 +142,18 @@ while len(dirs) > 0:
                     if args.fsd:
                         targets = targets + [fsd_results]
 
-                    if all([it in result for result in targets]):
-                        print('Already generated', it, path)
-                    else:
-                        sampler = SeededSampler(path,
-                                                model_path=os.path.join(root, checkpoint_dir, checkpoint),
-                                                pretrained=config['pretrained'],
-                                                useLabelGen=args.useLabelGen,
-                                                iteration_label_gen=int(it))
-                        dataset_name = get_dataset_from_path(path)
+                    # if all([it in result for result in targets]):
+                    #     print('Already generated', it, path)
+                    # else:
+                    sampler = SeededSampler(path,
+                                            model_path=os.path.join(root, checkpoint_dir, checkpoint),
+                                            pretrained=config['pretrained'],
+                                            useLabelGen=args.useLabelGen,
+                                            iteration_label_gen=int(it))
+                    dataset_name = get_dataset_from_path(path)
 
-                        # samples = sample(sampler, args.useLabelGen)
-                        # np.savez(samples_path, fake=samples, real=dataset_name)
+                    # samples = sample(sampler, args.useLabelGen)
+                    # np.savez(samples_path, fake=samples, real=dataset_name)
 
                     arguments = f'--samples {samples_path} --it {it} --results_dir {results_dir}'
                     if args.fid and it not in fid_results:
@@ -167,4 +168,5 @@ while len(dirs) > 0:
                         gt_path = dataset_to_img[dataset_name]
                         os.system(f'CUDA_VISIBLE_DEVICES={device} python -m seeing.fsd {gt_path} {samples_path} --it {it} --results_dir {results_dir}')
                     if args.lpips:
+                        arguments = f'--samples {samples_path} --results_dir {results_dir} --device {device}'
                         os.system(f'CUDA_VISIBLE_DEVICES={device} python gan_training/metrics/lpips.py {arguments}')
