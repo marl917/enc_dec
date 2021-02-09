@@ -16,6 +16,7 @@ parser.add_argument('--it_lab', type=int, default=-1, help='If set, computes num
 parser.add_argument('--every', type=int, default=-1, help='skips some checkpoints and only computes those whose iteration number are divisible by every')
 parser.add_argument('--fid', action='store_true', help='compute FID metric')
 parser.add_argument('--inception', action='store_true', help='compute IS metric')
+parser.add_argument('--lpips', action='store_true', help='compute lpips similarity')
 parser.add_argument('--modes', action='store_true', help='compute # modes and reverse-KL metric')
 parser.add_argument('--fsd', action='store_true', help='compute FSD metric')
 parser.add_argument('--cluster_metrics', action='store_true', help='compute clustering metrics (NMI, purity)')
@@ -151,8 +152,8 @@ while len(dirs) > 0:
                                                 iteration_label_gen=int(it))
                         dataset_name = get_dataset_from_path(path)
 
-                        # samples = sample(sampler, args.useLabelGen)
-                        # np.savez(samples_path, fake=samples, real=dataset_name)
+                        samples = sample(sampler, args.useLabelGen)
+                        np.savez(samples_path, fake=samples, real=dataset_name)
 
                     arguments = f'--samples {samples_path} --it {it} --results_dir {results_dir}'
                     if args.fid and it not in fid_results:
@@ -166,3 +167,5 @@ while len(dirs) > 0:
                     if args.fsd and it not in fsd_results:
                         gt_path = dataset_to_img[dataset_name]
                         os.system(f'CUDA_VISIBLE_DEVICES={device} python -m seeing.fsd {gt_path} {samples_path} --it {it} --results_dir {results_dir}')
+                    if args.lpips:
+                        os.system(f'CUDA_VISIBLE_DEVICES={device} python gan_training/metrics/lpips.py {arguments}')
