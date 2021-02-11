@@ -254,9 +254,12 @@ def main():
                       label_gen_optimizer=label_gen_optimizer,
                       gan_type=config['training']['gan_type'],
                       con_loss = config['training']['con_loss'] if 'con_loss' in config['training'] else False,
+                      entropy_loss=config['training']['entropy_loss'] if 'entropy_loss' in config['training'] else False,
                       decDeterministic = config['decoder']['deterministicOnSeg'],
-                      lambda_LabConLoss = config['training']['lambda_LabConLoss'] if 'lambda_LabConLoss' in config['training'] else 1)
-    print(config['training']['lambda_LabConLoss'])
+                      lambda_LabConLoss = config['training']['lambda_LabConLoss'] if 'lambda_LabConLoss' in config['training'] else 1,
+                      n_locallabels=config['encoder']['n_locallabels'])
+    print(config['training']['lambda_LabConLoss'],
+          )
 
     # Training loop
     # see_cluster_frequency(train_loader, encoder)

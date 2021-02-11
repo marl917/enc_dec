@@ -1,0 +1,32 @@
+decoder:
+  deterministicOnSeg: False
+  nlabels: 1
+  n_locallabels: 20
+z_dist:
+  type: uniform
+  dim: 5
+encoder:
+  nlabels: 1
+  n_locallabels: 20
+  kwargs:
+    deeper_arch: False
+discriminator:
+  nlabels: 1
+  n_locallabels: 20
+  kwargs:
+    noSegPath: False
+label_generator:
+  zdim: 50
+  label_size: 16
+  nlabels: 1
+  n_locallabels: 20
+  conditioning: unconditional
+  kwargs:
+    deeper_arch: True
+inherit_from: configs/lsun/default.yaml
+training:
+  out_dir: output/lsun/selfcondgan_labelRes16_modArchi_DCGANDisc_deeperarchLG_K_20_ZImg5_ZLab50_entropy
+  reg_param: 0.1
+  con_loss: True
+  lambda_LabConLoss: 0.1
+  entropy_loss: True

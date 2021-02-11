@@ -27,7 +27,9 @@ class Trainer(object):
                  label_gen_optimizer = None,
                  decDeterministic = False,
                  con_loss = False,
-                 lambda_LabConLoss=1):
+                 entropy_loss = False,
+                 lambda_LabConLoss=1,
+                 n_locallabels=0):
 
         self.decoder = decoder
         self.encoder = encoder
@@ -43,10 +45,13 @@ class Trainer(object):
         self.lambda_LabConLoss = lambda_LabConLoss
 
         self.gan_type = gan_type
+        self.n_locallabels = n_locallabels
 
         self.con_loss = con_loss
+        self.entropy_loss = entropy_loss
         self.decDeterministic = decDeterministic
         print("TRAINING WITH CON LOSS : ", con_loss)
+        print("TRAINING WITH ENTROPY LOSS : ", entropy_loss)
 
 
     def normalNLLLoss(self, x, mu, var):
@@ -109,6 +114,17 @@ class Trainer(object):
         #second part : train encoder
 
         label_map_real_unorm, label_map_real= self.encoder(x_real)
+
+        entropy_loss = torch.tensor(0., device='cuda')
+        if self.entropy_loss:
+            argmax_labMap_real  = torch.argmax(label_map_real, dim = 1)
+
+            proba = torch.bincount(argmax_labMap_real.view(-1), minlength=self.n_locallabels)
+            proba = proba.float()/torch.sum(proba)
+            entropy_loss = proba * torch.log(proba)
+            entropy_loss = torch.sum(entropy_loss)
+            G_losses['entropy loss'] = entropy_loss.item()
+
         # print("encoder : ", label_map_real.size())
         g_real_enc = self.discriminator(x_real, seg=label_map_real)
 
@@ -120,7 +136,7 @@ class Trainer(object):
         G_losses['gloss'] = gloss.item()
 
 
-        tot_loss = (gloss + con_loss_lab + con_loss_img).mean()
+        tot_loss = (gloss + con_loss_lab + con_loss_img + entropy_loss).mean()
         tot_loss.backward()
 
         # for p in self.encoder.parameters():

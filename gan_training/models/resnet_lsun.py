@@ -480,6 +480,7 @@ class BiGANDiscriminator(nn.Module):
                  img_size,
                  label_size,
                  nfilter=64,
+                 noSegPath=True,
                  **kwargs):
         super().__init__()
         s0 = self.s0 = label_size
@@ -489,8 +490,10 @@ class BiGANDiscriminator(nn.Module):
         self.local_nlabels = local_nlabels
         self.img_size = img_size
         self.label_size =label_size
+        self.noSegPath = noSegPath
+        print("Using Seg Path : ", not noSegPath)
 
-        bn = blocks.BatchNorm2d
+        # bn = blocks.BatchNorm2d
 
         #inference over x
         # self.conv_img = nn.Conv2d(3, 1 * nf, 3, padding=1)
@@ -528,12 +531,13 @@ class BiGANDiscriminator(nn.Module):
                                    nn.BatchNorm2d(ndf * 8),
                                    nn.LeakyReLU(0.2, inplace=True))
         #inference over seg
-        self.conv1z = nn.Sequential(nn.Conv2d(self.local_nlabels, ndf * 2, 1, 1, padding=0, bias=False),
-                                    nn.LeakyReLU(0.2, inplace=True))
-        self.conv2z = nn.Sequential(nn.Conv2d(ndf * 2, ndf * 4, 1, 1, padding=0, bias=False),
-                                    nn.LeakyReLU(0.2, inplace=True))
-        self.conv3z = nn.Sequential(nn.Conv2d(ndf * 4, ndf * 8, 1, 1, padding=0, bias=False),
-                                    nn.LeakyReLU(0.2, inplace=True))
+        if not self.noSegPath:
+            self.conv1z = nn.Sequential(nn.Conv2d(self.local_nlabels, ndf * 2, 1, 1, padding=0, bias=False),
+                                        nn.LeakyReLU(0.2, inplace=True))
+            self.conv2z = nn.Sequential(nn.Conv2d(ndf * 2, ndf * 4, 1, 1, padding=0, bias=False),
+                                        nn.LeakyReLU(0.2, inplace=True))
+            self.conv3z = nn.Sequential(nn.Conv2d(ndf * 4, ndf * 8, 1, 1, padding=0, bias=False),
+                                        nn.LeakyReLU(0.2, inplace=True))
 
         # self.resnet_3_0_seg = ResnetBlock(self.local_nlabels, 4 * nf, bn)
         # self.resnet_3_1_seg = ResnetBlock(4 * nf, 8 * nf, bn)
@@ -548,7 +552,11 @@ class BiGANDiscriminator(nn.Module):
         # self.conv2xz = nn.Sequential(nn.Conv2d(nf * 16, 1, 1, stride=1, bias=False), nn.LeakyReLU(0.2, inplace=True))
         # self.fc_out_joint = blocks.LinearUnconditionalLogits(s0 * s0)
 
-        self.conv1xz = nn.Sequential(nn.Conv2d(ndf * 16, ndf * 16, 1, stride=1, bias=False),
+        if not self.noSegPath:
+            self.conv1xz = nn.Sequential(nn.Conv2d(ndf * 16, ndf * 16, 1, stride=1, bias=False),
+                                         nn.LeakyReLU(0.2, inplace=True))
+        else:
+            self.conv1xz = nn.Sequential(nn.Conv2d(ndf * 8 + self.local_nlabels, ndf * 16, 1, stride=1, bias=False),
                                      nn.LeakyReLU(0.2, inplace=True))
         self.conv2xz = nn.Sequential(nn.Conv2d(ndf * 16, ndf * 16, 1, stride=1, bias=False), nn.LeakyReLU(0.2, inplace=True))
         self.conv3xz = nn.Sequential(nn.Conv2d(ndf * 16, 1, 1, stride=1, bias=False), nn.LeakyReLU(0.2, inplace=True))
@@ -608,7 +616,8 @@ class BiGANDiscriminator(nn.Module):
     def forward(self, input, seg):
         # print("dim of seg and input  : ", seg.size(), input.size())
         inputbis = self.inf_x(input)
-        seg = self.inf_seg(seg)
+        if not self.noSegPath:
+            seg = self.inf_seg(seg)
         # print(seg.size(), inputbis.size())
         xseg = torch.cat((inputbis, seg), dim=1)
         xseg = self.inf_xseg(xseg)
