@@ -23,7 +23,7 @@ label_generator:
     deeper_arch: False
 inherit_from: configs/lsun/default.yaml
 training:
-  out_dir: output/lsun/selfcondgan_labelRes16_DCGANDisc_K_15_lambda0.1_ZImg5_ZLab50
+  out_dir: output/lsun/selfcondgan_labelRes16_modArchi_DCGANDisc_deeperarch_K_15_lambda0.1_ZImg10_ZLab50
   reg_param: 0.1
   con_loss: True
   lambda_LabConLoss: 0.1

@@ -153,7 +153,8 @@ class Evaluator(object):
 
             x_fake = self.decoder(seg = label_map, input = z)
             print("min max of fake img : ", torch.min(x_fake), torch.max(x_fake))
-            color_lab_map = self.create_colormap(label_map)
+            lab_up = F.interpolate(label_map.float(), size=x_real.size()[2:], mode='bilinear', align_corners=True)
+            color_lab_map = self.create_colormap(lab_up)
 
             count = torch.bincount(torch.argmax(label_map, dim = 1).view(-1), minlength=self.n_locallabels)
             print("occurence on label maps from dataset img for each classes", count)

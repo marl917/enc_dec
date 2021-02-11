@@ -358,6 +358,7 @@ class LabelGenerator(nn.Module):
         if not self.modified:
             s0 = self.s0 = label_size // 4
             self.fc = nn.Linear(z_dim, 8 * nf * s0 * s0,bn)
+
             self.resnet_0_0 = ResnetBlock(8 * nf, 8 * nf,bn)
             self.resnet_1_0 = ResnetBlock(8 * nf, 4 * nf,bn)
 
@@ -369,24 +370,37 @@ class LabelGenerator(nn.Module):
         else:
             print("deeper archi for label generator")
             s0 = self.s0 = label_size // 8
-            self.fc = nn.Linear(z_dim, 16 * nf * s0 * s0)
-            self.resnet_0_0 = ResnetBlock(16 * nf, 16 * nf, bn )
-            self.resnet_0_1 = ResnetBlock(16 * nf, 16 * nf, bn)
+            self.fc = nn.Linear(z_dim, 16 * nf * s0 * s0, bn)
 
-            self.resnet_0_2 = ResnetBlock(16 * nf, 16 * nf, bn)
-            self.resnet_0_3 = ResnetBlock(16 * nf, 16 * nf, bn)
+            self.resnet_0_0 = ResnetBlock(16 * nf, 16 * nf, bn)
+            self.resnet_0_1 = ResnetBlock(16 * nf, 8 * nf, bn)
 
-            self.resnet_1_0 = ResnetBlock(16 * nf, 8 * nf, bn)
-            self.resnet_1_1 = ResnetBlock(8 * nf, 8 * nf, bn )
+            self.resnet_1_0 = ResnetBlock(8 * nf, 8 * nf, bn)
+            self.resnet_1_1 = ResnetBlock(8 * nf, 4 * nf, bn)
 
-            self.resnet_2_0 = ResnetBlock(8 * nf, 4 * nf, bn )
-            self.resnet_2_1 = ResnetBlock(4 * nf, 4 * nf, bn )
+            self.resnet_2_0 = ResnetBlock(4 * nf, 4 * nf, bn)
+            self.resnet_2_1 = ResnetBlock(4 * nf, 2 * nf, bn)
 
-            self.resnet_3_0 = ResnetBlock(4 * nf, 2* nf, bn )
-            self.resnet_3_1 = ResnetBlock(2 * nf, 2 * nf, bn )
+            self.resnet_3_0 = ResnetBlock(2 * nf, 1 * nf, bn)
 
-            self.resnet_4_0 = ResnetBlock(2 * nf, 1 * nf, bn)
-            self.resnet_4_1 = ResnetBlock(1 * nf, 1 * nf, bn)
+            # self.fc = nn.Linear(z_dim, 16 * nf * s0 * s0)
+            # self.resnet_0_0 = ResnetBlock(16 * nf, 16 * nf, bn )
+            # self.resnet_0_1 = ResnetBlock(16 * nf, 16 * nf, bn)
+            #
+            # self.resnet_0_2 = ResnetBlock(16 * nf, 16 * nf, bn)
+            # self.resnet_0_3 = ResnetBlock(16 * nf, 16 * nf, bn)
+            #
+            # self.resnet_1_0 = ResnetBlock(16 * nf, 8 * nf, bn)
+            # self.resnet_1_1 = ResnetBlock(8 * nf, 8 * nf, bn )
+            #
+            # self.resnet_2_0 = ResnetBlock(8 * nf, 4 * nf, bn )
+            # self.resnet_2_1 = ResnetBlock(4 * nf, 4 * nf, bn )
+            #
+            # self.resnet_3_0 = ResnetBlock(4 * nf, 2* nf, bn )
+            # self.resnet_3_1 = ResnetBlock(2 * nf, 2 * nf, bn )
+            #
+            # self.resnet_4_0 = ResnetBlock(2 * nf, 1 * nf, bn)
+            # self.resnet_4_1 = ResnetBlock(1 * nf, 1 * nf, bn)
 
 
 
@@ -428,20 +442,32 @@ class LabelGenerator(nn.Module):
             out = self.resnet_0_0(out)
             out = self.resnet_0_1(out)
             out = F.interpolate(out, scale_factor=2)
-            out = self.resnet_0_2(out)
-            out = self.resnet_0_3(out)
-
             out = self.resnet_1_0(out)
             out = self.resnet_1_1(out)
             out = F.interpolate(out, scale_factor=2)
             out = self.resnet_2_0(out)
             out = self.resnet_2_1(out)
             out = F.interpolate(out, scale_factor=2)
-            out = self.resnet_3_0(out)
-            out = self.resnet_3_1(out)
+            out = actvn(self.resnet_3_0(out))
 
-            out = self.resnet_4_0(out)
-            out = actvn(self.resnet_4_1(out))
+        #     out = out.view(z.size(0), 16 * self.nf, self.s0, self.s0)
+        #     out = self.resnet_0_0(out)
+        #     out = self.resnet_0_1(out)
+        #     out = F.interpolate(out, scale_factor=2)
+        #     out = self.resnet_0_2(out)
+        #     out = self.resnet_0_3(out)
+        #
+        #     out = self.resnet_1_0(out)
+        #     out = self.resnet_1_1(out)
+        #     out = F.interpolate(out, scale_factor=2)
+        #     out = self.resnet_2_0(out)
+        #     out = self.resnet_2_1(out)
+        #     out = F.interpolate(out, scale_factor=2)
+        #     out = self.resnet_3_0(out)
+        #     out = self.resnet_3_1(out)
+        #
+        #     out = self.resnet_4_0(out)
+        #     out = actvn(self.resnet_4_1(out))
         logits = self.conv_img(out)
         label_map, y_unorm = self.gumble_softmax(logits)
         # print("size of label map :", label_map.size())

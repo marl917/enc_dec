@@ -293,7 +293,6 @@ def main():
 
                 z_test = zdist.sample((ntest,))
                 x, lab_color = evaluator.create_samples(x_test, z_test)
-                lab_color = F.interpolate(lab_color.float(), size=x.size()[2:], mode='bilinear', align_corners=True)
                 logger.add_imgs(x, 'all', it)
                 logger.add_imgs(lab_color, 'all', it+2)
 
@@ -304,7 +303,7 @@ def main():
 
 
             # (ii) Compute inception if necessary
-            if (it -1) % inception_every == 0 and it > 1 or it == 5001:
+            if (it -1) % inception_every == 0 and it > 1 or it == 5001 and False:
                 print('PyTorch Inception score...')
                 inception_mean_label, inception_std_label = evaluator.compute_inception_score(labelgen=True)
                 logger.add('metrics', 'pt_inception_mean', inception_mean_label, it=it)
