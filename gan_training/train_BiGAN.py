@@ -122,6 +122,7 @@ class Trainer(object):
             proba = torch.bincount(argmax_labMap_real.view(-1), minlength=self.n_locallabels)
             proba = proba.float()/torch.sum(proba)
             entropy_loss = proba * torch.log(proba)
+            entropy_loss[entropy_loss!=entropy_loss] =0
             entropy_loss = torch.sum(entropy_loss)
             G_losses['entropy loss'] = entropy_loss.item()
 
@@ -142,6 +143,13 @@ class Trainer(object):
         # for p in self.encoder.parameters():
         #     print(p.grad)
         # sys.exit()
+        if check_norm and False:
+            total_norm = 0
+            for p in self.decoder.parameters():
+                param_norm = p.grad.data.norm(2)
+                total_norm += param_norm.item() ** 2
+                total_norm = total_norm ** (1. / 2)
+                print(total_norm)
 
         self.enc_optimizer.step()
         self.dec_optimizer.step()

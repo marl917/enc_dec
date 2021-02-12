@@ -4,16 +4,20 @@ decoder:
   n_locallabels: 10
 z_dist:
   type: uniform
-  dim: 25
+  dim: 5
 encoder:
   nlabels: 1
   n_locallabels: 10
   kwargs:
-    deeper_arch: True
+    deeper_arch: False
+    classifier_mod: False
 discriminator:
   nlabels: 1
   n_locallabels: 10
+  kwargs:
+    noSegPath: True
 label_generator:
+  zdim: 50
   label_size: 16
   nlabels: 1
   n_locallabels: 10
@@ -22,6 +26,8 @@ label_generator:
     deeper_arch: True
 inherit_from: configs/lsun/default.yaml
 training:
-  out_dir: output/lsun/selfcondgan_labelRes16_modArchi_DCGANDisc_deeperarch_imgZsize_25
+  out_dir: output/lsun/selfcondgan_labelRes16_modArchi_DCGANDisc_deeperarchLG_K_10_ZImg5_ZLab50_DifArchiDisc
   reg_param: 0.1
   con_loss: True
+  lambda_LabConLoss: 0.1
+  entropy_loss: False

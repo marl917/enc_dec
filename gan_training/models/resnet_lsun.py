@@ -555,12 +555,21 @@ class BiGANDiscriminator(nn.Module):
         if not self.noSegPath:
             self.conv1xz = nn.Sequential(nn.Conv2d(ndf * 16, ndf * 16, 1, stride=1, bias=False),
                                          nn.LeakyReLU(0.2, inplace=True))
+            self.conv2xz = nn.Sequential(nn.Conv2d(ndf * 16, ndf * 16, 1, stride=1, bias=False),
+                                         nn.LeakyReLU(0.2, inplace=True))
+            self.conv3xz = nn.Sequential(nn.Conv2d(ndf * 16, 1, 1, stride=1, bias=False),
+                                         nn.LeakyReLU(0.2, inplace=True))
+            self.fc_out_joint = blocks.LinearUnconditionalLogits(s0 * s0)
         else:
             self.conv1xz = nn.Sequential(nn.Conv2d(ndf * 8 + self.local_nlabels, ndf * 16, 1, stride=1, bias=False),
                                      nn.LeakyReLU(0.2, inplace=True))
-        self.conv2xz = nn.Sequential(nn.Conv2d(ndf * 16, ndf * 16, 1, stride=1, bias=False), nn.LeakyReLU(0.2, inplace=True))
-        self.conv3xz = nn.Sequential(nn.Conv2d(ndf * 16, 1, 1, stride=1, bias=False), nn.LeakyReLU(0.2, inplace=True))
-        self.fc_out_joint = blocks.LinearUnconditionalLogits(s0*s0)
+            self.conv2xz = nn.Sequential(nn.Conv2d(ndf * 16, ndf * 16, 1, stride=1, bias=False), nn.LeakyReLU(0.2, inplace=True))
+            # self.conv2xzbis1 = nn.Sequential(nn.Conv2d(ndf * 16, ndf * 16, 3, 1,1),
+            #                              nn.LeakyReLU(0.2, inplace=True))
+            self.conv2xzbis2 = nn.Sequential(nn.Conv2d(ndf * 16, ndf * 8, 1, stride=1, bias=False),
+                                         nn.LeakyReLU(0.2, inplace=True))
+            self.conv3xz = nn.Sequential(nn.Conv2d(ndf * 8, 1, 1, stride=1, bias=False), nn.LeakyReLU(0.2, inplace=True))
+            self.fc_out_joint = blocks.LinearUnconditionalLogits(s0*s0)
 
 
     def inf_x(self,img):
@@ -608,6 +617,9 @@ class BiGANDiscriminator(nn.Module):
 
         out = self.conv1xz(xseg)
         out = self.conv2xz(out)
+        if self.noSegPath:
+            # out = self.conv2xzbis1(out)
+            out = self.conv2xzbis2(out)
         out = self.conv3xz(out)
         out = out.view(out.size(0), -1)
         out = self.fc_out_joint(out)
