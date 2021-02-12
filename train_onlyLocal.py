@@ -35,6 +35,7 @@ parser.add_argument('--outdir', type=str, help='used to override outdir (useful 
 parser.add_argument('--nepochs', type=int, default=250, help='number of epochs to run before terminating')
 parser.add_argument('--model_it', type=int, default=-1, help='which model iteration to load from, -1 loads the most recent model')
 parser.add_argument('--devices', nargs='+', type=str, default=['0','1'], help='devices to use')
+parser.add_argument('--eval_mode', action='store_true', help='save sample images')
 
 args = parser.parse_args()
 config = load_config(args.config, 'configs/default.yaml')
@@ -261,6 +262,26 @@ def main():
     print(config['training']['lambda_LabConLoss'],
           )
 
+    if args.eval_mode:
+        # test with same z_img, different segmentations
+        n_samples = 16
+        for i in range(20):
+            z_lab = zdist_lab.sample((n_samples,))
+            z_test_same = zdist.sample((1,))
+            z_test_same = torch.cat((z_test_same,) * n_samples, dim=0)
+            print(z_test_same.size())
+            x = evaluator.create_samples_labelGen(z_test_same, z_lab, out_dir=out_dir)
+            logger.add_imgs(x, 'sameZImg', i)
+
+        # test with different z_img, same seg
+        for i in range(20):
+            z_test = zdist.sample((n_samples,))
+            z_lab_same = zdist_lab.sample((1,))
+            z_lab_same = torch.cat((z_lab_same,) * n_samples, dim=0)
+            print(z_lab_same.size())
+            x = evaluator.create_samples_labelGen(z_test, z_lab_same, out_dir=out_dir)
+            logger.add_imgs(x, 'sameZLab', i)
+        sys.exit()
     # Training loop
     # see_cluster_frequency(train_loader, encoder)
     print('Start training...')
@@ -302,7 +323,6 @@ def main():
                 z_lab = zdist_lab.sample((ntest,))
                 x = evaluator.create_samples_labelGen(z_test, z_lab, out_dir=out_dir)
                 logger.add_imgs(x, 'all', it+1)
-
 
 
             # (ii) Compute inception if necessary
