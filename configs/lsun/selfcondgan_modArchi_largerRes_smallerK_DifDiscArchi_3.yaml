@@ -15,7 +15,7 @@ discriminator:
   nlabels: 1
   n_locallabels: 5
   kwargs:
-    noSegPath: 1
+    noSegPath: 3
 label_generator:
   zdim: 30
   label_size: 16
@@ -26,7 +26,7 @@ label_generator:
     deeper_arch: True
 inherit_from: configs/lsun/default.yaml
 training:
-  out_dir: output/lsun/selfcondgan_labelRes16_modArchi_DCGANDisc_deeperarchLG_K_5_ZImg5_ZLab30_DifArchiDisc_lrdecay
+  out_dir: output/lsun/selfcondgan_labelRes16_modArchi_DCGANDisc_deeperarchLG_K_5_ZImg5_ZLab30_DifArchiDisc_var3_lrdecay
   reg_param: 0.1
   con_loss: True
   lambda_LabConLoss: 0.1

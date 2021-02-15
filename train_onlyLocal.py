@@ -36,7 +36,7 @@ parser.add_argument('--nepochs', type=int, default=250, help='number of epochs t
 parser.add_argument('--model_it', type=int, default=-1, help='which model iteration to load from, -1 loads the most recent model')
 parser.add_argument('--devices', nargs='+', type=str, default=['0','1'], help='devices to use')
 parser.add_argument('--eval_mode', action='store_true', help='save sample images')
-parser.add_argument('--niterBeforeLRDecay', type=int, default=90, help='number of epochs to run before lr decay')
+parser.add_argument('--niterBeforeLRDecay', type=int, default=100, help='number of epochs to run before lr decay')
 parser.add_argument('--niter_decay', type=int, default=100, help='number of epochs to run before lr decay')
 
 args = parser.parse_args()
