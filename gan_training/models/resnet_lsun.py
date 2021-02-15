@@ -538,11 +538,8 @@ class BiGANDiscriminator(nn.Module):
                                         nn.LeakyReLU(0.2, inplace=True))
             self.conv3z = nn.Sequential(nn.Conv2d(ndf * 4, ndf * 8, 1, 1, padding=0, bias=False),
                                         nn.LeakyReLU(0.2, inplace=True))
-
-        # self.resnet_3_0_seg = ResnetBlock(self.local_nlabels, 4 * nf, bn)
-        # self.resnet_3_1_seg = ResnetBlock(4 * nf, 8 * nf, bn)
-        # self.resnet_3_2_seg = ResnetBlock(2 * nf, 4 * nf, bn)
-        # self.resnet_3_3_seg = ResnetBlock(4 * nf, 8 * nf, bn)
+        else:
+            self.conv1z = nn.Conv2d(self.local_nlabels, ndf * 2, 1, 1, padding=0, bias=False)
 
         #joint inference
         # self.resnet_4_0 = ResnetBlock(16 * nf, 16 * nf, bn=blocks.Identity, use_shortcut=True, is_bias=False)
@@ -561,7 +558,7 @@ class BiGANDiscriminator(nn.Module):
                                          nn.LeakyReLU(0.2, inplace=True))
             self.fc_out_joint = blocks.LinearUnconditionalLogits(s0 * s0)
         else:
-            self.conv1xz = nn.Sequential(nn.Conv2d(ndf * 8 + self.local_nlabels, ndf * 16, 1, stride=1, bias=False),
+            self.conv1xz = nn.Sequential(nn.Conv2d(ndf * 8 + (ndf*2), ndf * 16, 1, stride=1, bias=False),
                                      nn.LeakyReLU(0.2, inplace=True))
             self.conv2xz = nn.Sequential(nn.Conv2d(ndf * 16, ndf * 16, 1, stride=1, bias=False), nn.LeakyReLU(0.2, inplace=True))
             # self.conv2xzbis1 = nn.Sequential(nn.Conv2d(ndf * 16, ndf * 16, 3, 1,1),
@@ -600,8 +597,9 @@ class BiGANDiscriminator(nn.Module):
         # out = self.resnet_3_3_seg(out)
 
         out = self.conv1z(seg)
-        out = self.conv2z(out)
-        out = self.conv3z(out)
+        if not self.noSegPath:
+            out = self.conv2z(out)
+            out = self.conv3z(out)
         return out
 
     def inf_xseg(self,xseg):
@@ -628,8 +626,8 @@ class BiGANDiscriminator(nn.Module):
     def forward(self, input, seg):
         # print("dim of seg and input  : ", seg.size(), input.size())
         inputbis = self.inf_x(input)
-        if not self.noSegPath:
-            seg = self.inf_seg(seg)
+        seg = self.inf_seg(seg)
+        # print(torch.min(seg), torch.max(seg), seg.size(), torch.min(self.conv1z.weight.data), torch.max(self.conv1z.weight.data), "seg min max values")
         # print(seg.size(), inputbis.size())
         xseg = torch.cat((inputbis, seg), dim=1)
         xseg = self.inf_xseg(xseg)
