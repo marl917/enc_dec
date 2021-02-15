@@ -157,7 +157,7 @@ def main():
             print('Found sigmoid layer in encoder; not compatible with BCE with logits')
             exit()
 
-    dec_optimizer, enc_optimizer, disc_optimizer, label_gen_optimizer = build_optimizers(decoder, encoder, discriminator, label_generator, config, qhead_disc = qhead_discriminator)
+    encdec_optimizer, disc_optimizer = build_optimizers(decoder, encoder, discriminator, label_generator, config, qhead_disc = qhead_discriminator)
 
     decoder = nn.DataParallel(decoder, device_ids=devices)
     encoder = nn.DataParallel(encoder, device_ids=devices)
@@ -173,9 +173,7 @@ def main():
                                    discriminator= discriminator,
                                    qhead_discriminator=qhead_discriminator,
                                    disc_optimizer=disc_optimizer,
-                                   enc_optimizer=enc_optimizer,
-                                   dec_optimizer=dec_optimizer,
-                                   label_gen_optimizer = label_gen_optimizer
+                                   encdec_optimizer=encdec_optimizer
                                    )
 
     # Logger
@@ -250,9 +248,7 @@ def main():
                       label_generator = label_generator,
                       qhead_discriminator = qhead_discriminator,
                       disc_optimizer= disc_optimizer,
-                      enc_optimizer=enc_optimizer,
-                      dec_optimizer=dec_optimizer,
-                      label_gen_optimizer=label_gen_optimizer,
+                      encdec_optimizer=encdec_optimizer,
                       gan_type=config['training']['gan_type'],
                       con_loss = config['training']['con_loss'] if 'con_loss' in config['training'] else False,
                       entropy_loss=config['training']['entropy_loss'] if 'entropy_loss' in config['training'] else False,
@@ -307,9 +303,7 @@ def main():
 
             # Print stats
             if it % log_every == 0:
-                print('[epoch %0d, it %4d]' % (epoch_idx, it))
-                print(gloss)
-                print(dloss)
+                print('[epoch %0d, it %4d]' % (epoch_idx, it), gloss, dloss)
 
             # (i) Sample if necessary
             if it % config['training']['sample_every'] == 0:

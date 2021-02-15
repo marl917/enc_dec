@@ -22,9 +22,7 @@ class Trainer(object):
                  label_generator,
                  qhead_discriminator=None,
                  disc_optimizer=None,
-                 enc_optimizer=None,
-                 dec_optimizer=None,
-                 label_gen_optimizer = None,
+                 encdec_optimizer=None,
                  decDeterministic = False,
                  con_loss = False,
                  entropy_loss = False,
@@ -38,9 +36,7 @@ class Trainer(object):
         self.qhead_discriminator = qhead_discriminator
 
         self.disc_optimizer = disc_optimizer
-        self.enc_optimizer = enc_optimizer
-        self.dec_optimizer = dec_optimizer
-        self.label_gen_optimizer = label_gen_optimizer
+        self.encdec_optimizer = encdec_optimizer
 
         self.lambda_LabConLoss = lambda_LabConLoss
 
@@ -82,9 +78,8 @@ class Trainer(object):
         self.discriminator.train()
 
 
-        self.enc_optimizer.zero_grad()
-        self.dec_optimizer.zero_grad()
-        self.label_gen_optimizer.zero_grad()
+        self.encdec_optimizer.zero_grad()
+
 
         G_losses = {}
 
@@ -151,9 +146,7 @@ class Trainer(object):
                 total_norm = total_norm ** (1. / 2)
                 print(total_norm)
 
-        self.enc_optimizer.step()
-        self.dec_optimizer.step()
-        self.label_gen_optimizer.step()
+        self.encdec_optimizer.step()
 
         return G_losses
         

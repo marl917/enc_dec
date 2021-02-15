@@ -132,19 +132,18 @@ def build_optimizers(decoder, encoder, discriminator, label_generator, config, q
     elif optimizer == 'adam':
         beta1 = config['training']['beta1']
         beta2 = config['training']['beta2']
-        if qhead_disc!=None:
-            dec_optimizer = optim.Adam(list(dec_params) + list(qhead_params), lr=lr_g, betas=(beta1, beta2), eps=1e-8)
-        else:
-            dec_optimizer = optim.Adam(dec_params, lr=lr_g,
-                                       betas=(beta1, beta2), eps=1e-8)
-        label_gen_optimizer = optim.Adam(labelGen_params, lr = lr_g, betas = (beta1, beta2), eps = 1e-8)
-        enc_optimizer = optim.Adam(enc_params, lr=lr_d, betas=(beta1, beta2), eps=1e-8)
+
+        encdec_optimizer = optim.Adam(list(dec_params) + list(qhead_params) + list(labelGen_params) + list(enc_params), lr=lr_g, betas=(beta1, beta2), eps=1e-8)
+
+        # label_gen_optimizer = optim.Adam(labelGen_params, lr = lr_g, betas = (beta1, beta2), eps = 1e-8)
+        # enc_optimizer = optim.Adam(enc_params, lr=lr_d, betas=(beta1, beta2), eps=1e-8)
         disc_optimizer = optim.Adam(disc_params, lr=lr_d, betas=(beta1, beta2), eps=1e-8)
     elif optimizer == 'sgd':
         g_optimizer = optim.SGD(g_params, lr=lr_g, momentum=0.)
         d_optimizer = optim.SGD(d_params, lr=lr_d, momentum=0.)
 
-    return dec_optimizer, enc_optimizer, disc_optimizer, label_gen_optimizer
+    # return dec_optimizer, enc_optimizer, disc_optimizer, label_gen_optimizer
+    return encdec_optimizer,disc_optimizer
 
 
 # Some utility functions
