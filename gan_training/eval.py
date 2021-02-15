@@ -126,6 +126,9 @@ class Evaluator(object):
             count = torch.bincount(torch.argmax(label_map, dim=1).view(-1), minlength=self.n_locallabels)
             print("occurence on label maps for gen label maps for each classes", count)
 
+            lab_up = F.interpolate(label_map.float(), size=x_fake1.size()[2:], mode='bilinear', align_corners=True)
+            color_lab_map = self.create_colormap(lab_up)
+
             # z_Bis = self.sample_z(z.size(0))
             # x_fake2 = self.decoder(seg = label_map, input = z_Bis)
             # print('range in labelGen sample', torch.min(x_fake), torch.max(x_fake), x_fake.size())
@@ -133,7 +136,7 @@ class Evaluator(object):
             # x_fake = self.decoder(z_fake)
 
         # return torch.cat((x_fake1, x_fake2), dim=0)
-        return x_fake1
+        return x_fake1, color_lab_map
     def create_samples(self, x_real,z):
         self.decoder.eval()
         self.encoder.eval()

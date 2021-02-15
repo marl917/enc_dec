@@ -270,7 +270,7 @@ def main():
             z_test_same = zdist.sample((1,))
             z_test_same = torch.cat((z_test_same,) * n_samples, dim=0)
             print(z_test_same.size())
-            x = evaluator.create_samples_labelGen(z_test_same, z_lab, out_dir=out_dir)
+            x,_ = evaluator.create_samples_labelGen(z_test_same, z_lab, out_dir=out_dir)
             logger.add_imgs(x, 'sameZImg', i)
 
         # test with different z_img, same seg
@@ -279,7 +279,8 @@ def main():
             z_lab_same = zdist_lab.sample((1,))
             z_lab_same = torch.cat((z_lab_same,) * n_samples, dim=0)
             print(z_lab_same.size())
-            x = evaluator.create_samples_labelGen(z_test, z_lab_same, out_dir=out_dir)
+            x,x_c = evaluator.create_samples_labelGen(z_test, z_lab_same, out_dir=out_dir)
+            x = torch.cat((torch.unsqueeze(x_c[0].float().cuda(),dim=0), x), dim = 0)
             logger.add_imgs(x, 'sameZLab', i)
         sys.exit()
     # Training loop
@@ -321,7 +322,7 @@ def main():
                 logger.add_imgs(lab_color, 'all', it+2)
 
                 z_lab = zdist_lab.sample((ntest,))
-                x = evaluator.create_samples_labelGen(z_test, z_lab, out_dir=out_dir)
+                x,_ = evaluator.create_samples_labelGen(z_test, z_lab, out_dir=out_dir)
                 logger.add_imgs(x, 'all', it+1)
 
 
