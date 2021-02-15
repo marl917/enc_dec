@@ -36,6 +36,8 @@ parser.add_argument('--nepochs', type=int, default=250, help='number of epochs t
 parser.add_argument('--model_it', type=int, default=-1, help='which model iteration to load from, -1 loads the most recent model')
 parser.add_argument('--devices', nargs='+', type=str, default=['0','1'], help='devices to use')
 parser.add_argument('--eval_mode', action='store_true', help='save sample images')
+parser.add_argument('--niterBeforeLRDecay', type=int, default=90, help='number of epochs to run before lr decay')
+parser.add_argument('--niter_decay', type=int, default=100, help='number of epochs to run before lr decay')
 
 args = parser.parse_args()
 config = load_config(args.config, 'configs/default.yaml')
@@ -282,8 +284,18 @@ def main():
     # Training loop
     # see_cluster_frequency(train_loader, encoder)
     print('Start training...')
+
+    for param_group in encdec_optimizer.param_groups:
+        lr = param_group['lr']
+        if epoch_idx >= args.niterBeforeLRDecay:
+            lr = lr*2
+        print("lr in optim", lr, epoch_idx)
+
+
     while it < args.nepochs * len(train_loader):
         epoch_idx += 1
+        lr = update_learning_rate(epoch_idx, lr, encdec_optimizer, disc_optimizer)
+        print(lr)
         for x_real, y in train_loader:
             it += 1
 
@@ -332,13 +344,32 @@ def main():
             # (iii) Backup if necessary
             if it % backup_every == 0 or it ==1000:
                 print('Saving backup...')
-                checkpoint_io.save('model_%08d.pt' % it, it=it)
+                checkpoint_io.save('model_%08d.pt' % it, it=it, epoch_idx = epoch_idx)
 
                 logger.save_stats('stats_%08d.p' % it)
 
                 if it > 0:
                     checkpoint_io.save('model.pt', it=it)
 
+
+def update_learning_rate(epoch, old_lr, encdec_optim, disc_optim):
+    if epoch >= args.niterBeforeLRDecay:
+        lrd = config['training']['lr_g'] / args.niter_decay
+        new_lr = old_lr - lrd
+        print(lrd)
+    else:
+        new_lr = old_lr
+
+    if new_lr != old_lr:
+        new_lr_G = new_lr / 2
+        new_lr_D = new_lr * 2
+
+        for param_group in encdec_optim.param_groups:
+            param_group['lr'] = new_lr_G
+        for param_group in disc_optim.param_groups:
+            param_group['lr'] = new_lr_D
+        print('update learning rate: %f -> %f' % (old_lr, new_lr))
+    return new_lr
 
 if __name__ == '__main__':
     exit_if_job_done(out_dir)
