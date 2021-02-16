@@ -12,13 +12,10 @@ dirs = list(args.paths)
 while len(dirs) > 0:
     path = dirs.pop()
     print(path)
-    x=[]
-    y=[]
     with open(path) as json_file:
         data = json.load(json_file)
-        for k,v in data.items():
-            x.append(k)
-            y.append(v)
+        lists = sorted(data.items())  # sorted by key, return a list of tuples
+        x, y = zip(*lists)  # unpack a list of pairs into two tuples
 
     fig = plt.figure()
     ax = fig.add_subplot(111)
