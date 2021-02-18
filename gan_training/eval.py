@@ -5,6 +5,7 @@ from gan_training import utils
 import torchvision
 import os
 import sys
+from tqdm import tqdm
 
 from gan_training.metrics import inception_score
 
@@ -109,6 +110,46 @@ class Evaluator(object):
                                            splits=1)
 
         return score, score_std
+
+    def get_fake_samples(self,BS=100):
+        self.decoder.eval()
+        self.label_generator.eval()
+        with torch.no_grad():
+            z_lab = self.sample_z_lab(BS)
+            z = self.sample_z(BS)
+            _, label_map = self.label_generator(z_lab)
+            x_fake = self.decoder(seg=label_map, input=z)
+        return x_fake
+
+    def get_dataset_from_path(self,path):
+        datasets = ['imagenet', 'cifar', 'stacked_mnist', 'places','lsun']
+        for name in datasets:
+            if name in path:
+                print('Inferred dataset:', name)
+                return name
+
+    def compute_fid_score(self, outdir, it):
+        samples = []
+        N = 50000
+        BS = 100
+        print("Starting to create samples for fid")
+        for _ in tqdm(range(N // BS + 1)):
+            x_fake =self.get_fake_samples(BS).detach().cpu()
+            x_fake = [x.detach().cpu() for x in x_fake]
+            samples.extend(x_fake)
+        samples = torch.stack(samples[:N], dim=0)
+        samples = (samples.permute(0, 2, 3, 1).mul_(0.5).add_(0.5).mul_(255)).clamp_(0, 255).numpy()
+
+        samples_path = os.path.join(outdir,'samples.npz')
+        dataset_name = self.get_dataset_from_path(outdir)
+        print("Saving samples in : ", samples_path)
+        np.savez(samples_path, fake=samples, real=dataset_name)
+
+        arguments = f'--samples {samples_path} --it {it} --results_dir {outdir}'
+        print("Computing fid score")
+        print(self.device)
+        os.system(f'CUDA_VISIBLE_DEVICES={0} python gan_training/metrics/fid.py {arguments}')
+
 
     def create_samples_labelGen(self,z, z_lab, out_dir=None):
         self.decoder.eval()

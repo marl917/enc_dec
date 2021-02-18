@@ -1,4 +1,5 @@
 import argparse
+import json
 import os
 import copy
 import pprint
@@ -98,6 +99,7 @@ def main():
     batch_size = config['training']['batch_size']
     log_every = config['training']['log_every']
     inception_every = config['training']['inception_every']
+    fid_every = config['training']['fid_every']
     backup_every = config['training']['backup_every']
     nlabels = config['data']['nlabels']
 
@@ -108,6 +110,17 @@ def main():
         os.makedirs(out_dir)
     if not path.exists(checkpoint_dir):
         os.makedirs(checkpoint_dir)
+
+    #to compute online fid
+    results_online_fid = path.join(out_dir, "fid")
+    if not path.exists(results_online_fid):
+        os.makedirs(results_online_fid)
+    results_file_fid = os.path.join(results_online_fid, 'fid_results.json')
+    if not os.path.exists(results_file_fid):
+        with open(results_file_fid, 'w') as f:
+            f.write(json.dumps({}))
+
+
     shutil.copyfile(args.config, os.path.join(out_dir, "config.yaml"))
     # Logger
     checkpoint_io = CheckpointIO(checkpoint_dir=checkpoint_dir)
@@ -340,6 +353,11 @@ def main():
                 logger.add('metrics', 'pt_inception_stddev', inception_std_label, it=it)
                 print(
                     f'[epoch {epoch_idx}, it {it}] for label gen pt_inception_mean: {inception_mean_label}, pt_inception_stddev: {inception_std_label}')
+
+            if (it -1) % fid_every == 0 and it > 1 or True:
+                print('Tensorflow FID score...')
+                evaluator.compute_fid_score(results_online_fid, it=it)
+
 
             # (iii) Backup if necessary
             if it % backup_every == 0 or it ==1000:
