@@ -27,7 +27,9 @@ class Trainer(object):
                  con_loss = False,
                  entropy_loss = False,
                  lambda_LabConLoss=1,
-                 n_locallabels=0):
+                 n_locallabels=0,
+                 reg_type=None,
+                 reg_param=None):
 
         self.decoder = decoder
         self.encoder = encoder
@@ -41,6 +43,9 @@ class Trainer(object):
         self.lambda_LabConLoss = lambda_LabConLoss
 
         self.gan_type = gan_type
+        self.reg_type = reg_type
+        self.reg_param = reg_param
+
         self.n_locallabels = n_locallabels
 
         self.con_loss = con_loss
@@ -113,7 +118,6 @@ class Trainer(object):
         entropy_loss = torch.tensor(0., device='cuda')
         if self.entropy_loss:
             argmax_labMap_real  = torch.argmax(label_map_real, dim = 1)
-
             proba = torch.bincount(argmax_labMap_real.view(-1), minlength=self.n_locallabels)
             proba = proba.float()/torch.sum(proba)
             entropy_loss = proba * torch.log(proba)
@@ -175,8 +179,17 @@ class Trainer(object):
         else:
             dloss_real = self.compute_loss(d_real[1], 1)
 
+        reg = torch.tensor(0., device='cuda')
+        if self.reg_type == 'real' or self.reg_type == 'real_fake':
+            print("compute reg loss")
+            dloss_real.backward(retain_graph=True)
+            reg = self.reg_param * compute_grad2(d_real[1], x_real).mean()
+            reg.backward()
+        else:
+            dloss_real.backward()
 
-        dloss_real.backward()
+
+
 
 
         # On fake data
@@ -199,6 +212,7 @@ class Trainer(object):
         losses = {}
         losses['dloss_real'] = dloss_real.item()
         losses['dloss_fake'] = dloss_fake.item()
+        losses['reg_loss'] = reg.item()
         return losses
 
     def compute_loss(self, d_out, target):
@@ -230,6 +244,18 @@ class Trainer(object):
 def toggle_grad(model, requires_grad):
     for p in model.parameters():
         p.requires_grad_(requires_grad)
+
+def compute_grad2(d_out, x_in):
+    batch_size = x_in.size(0)
+    grad_dout = autograd.grad(outputs=d_out.sum(),
+                              inputs=x_in,
+                              create_graph=True,
+                              retain_graph=True,
+                              only_inputs=True)[0]
+    grad_dout2 = grad_dout.pow(2)
+    assert (grad_dout2.size() == x_in.size())
+    reg = grad_dout2.view(batch_size, -1).sum(1)
+    return reg
 
 class VGG19(torch.nn.Module):
     def __init__(self, requires_grad=False):

@@ -269,7 +269,10 @@ def main():
                       entropy_loss=config['training']['entropy_loss'] if 'entropy_loss' in config['training'] else False,
                       decDeterministic = config['decoder']['deterministicOnSeg'],
                       lambda_LabConLoss = config['training']['lambda_LabConLoss'] if 'lambda_LabConLoss' in config['training'] else 1,
-                      n_locallabels=config['encoder']['n_locallabels'])
+                      n_locallabels=config['encoder']['n_locallabels'],
+                      reg_type=config['training']['reg_type'],
+                      reg_param=config['training']['reg_param']
+                      )
     print(config['training']['lambda_LabConLoss'],
           )
 
@@ -346,7 +349,7 @@ def main():
 
 
             # (ii) Compute inception if necessary
-            if (it -1) % inception_every == 0 and it > 1 or it == 5001 and False:
+            if (it - 1) % inception_every == 0 and it > 1 and False or it == 5001:
                 print('PyTorch Inception score...')
                 inception_mean_label, inception_std_label = evaluator.compute_inception_score(labelgen=True)
                 logger.add('metrics', 'pt_inception_mean', inception_mean_label, it=it)
@@ -354,7 +357,7 @@ def main():
                 print(
                     f'[epoch {epoch_idx}, it {it}] for label gen pt_inception_mean: {inception_mean_label}, pt_inception_stddev: {inception_std_label}')
 
-            if (it -1) % fid_every == 0 and it > 1 or True:
+            if (it - 1) % fid_every == 0 and it > 1 and False:
                 print('Tensorflow FID score...')
                 evaluator.compute_fid_score(results_online_fid, it=it)
 
@@ -372,9 +375,8 @@ def main():
 
 def update_learning_rate(epoch, old_lr, encdec_optim, disc_optim):
     if epoch >= args.niterBeforeLRDecay:
-        lrd = config['training']['lr_g'] / args.niter_decay
+        lrd = config['training']['lr_g'] / (4 * args.niter_decay)
         new_lr = old_lr - lrd
-        print(lrd)
     else:
         new_lr = old_lr
 
