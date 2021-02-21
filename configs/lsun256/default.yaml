@@ -5,25 +5,25 @@ data:
   img_size: 256
   nlabels: 1000
 decoder:
-  name: resnet_lsun
+  name: resnet_lsun256
   nlabels: 1
   conditioning: unconditional
   kwargs:
     placeholder: None
 encoder:
-  name: resnet_lsun
+  name: resnet_lsun256
   nlabels: 1
   conditioning: unconditional
   kwargs:
     placeholder: None
 label_generator:
   label_size: 16
-  name: resnet_lsun
+  name: resnet_lsun256
   zdim: 50
   kwargs:
     placeholder: None
 discriminator:
-  name: resnet_lsun
+  name: resnet_lsun256
 z_dist:
   type: uniform
   dim: 256
