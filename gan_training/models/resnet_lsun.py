@@ -528,9 +528,14 @@ class BiGANDiscriminator(nn.Module):
             self.conv3z = nn.Sequential(nn.Conv2d(ndf * 4, ndf * 8, 1, 1, padding=0, bias=False),
                                         nn.LeakyReLU(0.2, inplace=True))
         elif self.noSegPath ==1:
-            self.conv1z = nn.Conv2d(self.local_nlabels, ndf * 2, 1, 1, padding=0, bias=False)
+            self.conv1z = nn.Conv2d(self.local_nlabels, ndf * 8, 1, 1, padding=0, bias=False)
         elif self.noSegPath == 2:
-            self.conv1z = nn.Sequential( nn.Conv2d(self.local_nlabels, ndf * 2, 1, 1, padding=0, bias=False),nn.LeakyReLU(0.2, inplace=True),nn.Conv2d(ndf * 2, ndf * 4, 1, 1, padding=0, bias=False))
+            self.conv1z = nn.Sequential(nn.Conv2d(self.local_nlabels, ndf*2, 1, 1, padding=0, bias=False),
+                nn.Conv2d(ndf*2, ndf * 4, 3, 1, padding=1),
+                                        nn.LeakyReLU(0.2, inplace=True),
+                                        nn.Conv2d(ndf*4, ndf * 8, 3, 1, padding=1),
+                                        nn.LeakyReLU(0.2, inplace=True),
+                                        )
         elif self.noSegPath == 3:
             self.conv1z = nn.Sequential(nn.Conv2d(self.local_nlabels, ndf * 2, 3, 1, padding=1, bias=False),
                                         nn.LeakyReLU(0.2, inplace=True),
@@ -547,8 +552,10 @@ class BiGANDiscriminator(nn.Module):
             self.fc_out_joint = blocks.LinearUnconditionalLogits(s0 * s0)
         else:
             if self.noSegPath ==1:
-                input_nc_seg = ndf*2
-            elif self.noSegPath in [2,3]:
+                input_nc_seg = ndf*8
+            elif self.noSegPath ==2:
+                input_nc_seg = ndf*8
+            elif self.noSegPath ==3:
                 input_nc_seg = ndf*4
             self.conv1xz = nn.Sequential(nn.Conv2d(ndf * 8 + input_nc_seg, ndf * 16, 1, stride=1, bias=False),
                                      nn.LeakyReLU(0.2, inplace=True))
