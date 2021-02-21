@@ -181,7 +181,6 @@ class Trainer(object):
 
         reg = torch.tensor(0., device='cuda')
         if self.reg_type == 'real' or self.reg_type == 'real_fake':
-            print("compute reg loss")
             dloss_real.backward(retain_graph=True)
             reg = self.reg_param * compute_grad2(d_real[1], x_real).mean()
             reg.backward()
