@@ -4,6 +4,7 @@ decoder_dict = {
     'dcgan_deep_onlylocal_clust': dcgan_deep_onlylocal_clust.Decoder,
     'resnet' : resnet.Decoder,
     'resnet_lsun': resnet_lsun.Decoder,
+    'resnet_lsun_small': resnet_lsun.smallDecoder,
     'resnet_lsun256': resnet_lsun256.Decoder
 }
 

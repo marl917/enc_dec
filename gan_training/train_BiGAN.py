@@ -100,16 +100,11 @@ class Trainer(object):
         con_loss_lab = torch.tensor(0., device='cuda')
         con_loss_img = torch.tensor(0., device='cuda')
         if self.con_loss:
-            if self.decDeterministic:
-                mu, var = self.qhead_discriminator(g_fake[0])
-                con_loss_lab = self.normalNLLLoss(z_lab,mu,var) * 0.1
-                G_losses['con_loss_lab'] = con_loss_lab.item()
-            else:
-                mu_lab, var_lab, mu_img, var_img = self.qhead_discriminator(g_fake[0])
-                con_loss_lab = self.normalNLLLoss(z_lab, mu_lab, var_lab) * self.lambda_LabConLoss
-                con_loss_img = self.normalNLLLoss(z, mu_img, var_img) * 0.1
-                G_losses['con_loss_img'] = con_loss_img.item()
-                G_losses['con_loss_lab'] = con_loss_lab.item()
+            mu_lab, var_lab, mu_img, var_img = self.qhead_discriminator(g_fake[0])
+            con_loss_lab = self.normalNLLLoss(z_lab, mu_lab, var_lab) * self.lambda_LabConLoss
+            con_loss_img = self.normalNLLLoss(z, mu_img, var_img) * 0.1
+            G_losses['con_loss_img'] = con_loss_img.item()
+            G_losses['con_loss_lab'] = con_loss_lab.item()
             # print("mu and var max min", torch.min(var), torch.max(var))
         #second part : train encoder
 
@@ -151,6 +146,10 @@ class Trainer(object):
                 print(total_norm)
 
         self.encdec_optimizer.step()
+
+        toggle_grad(self.encoder, False)
+        toggle_grad(self.decoder, False)
+        toggle_grad(self.label_generator, False)
 
         return G_losses
         
@@ -212,6 +211,10 @@ class Trainer(object):
         losses['dloss_real'] = dloss_real.item()
         losses['dloss_fake'] = dloss_fake.item()
         losses['reg_loss'] = reg.item()
+
+
+        toggle_grad(self.discriminator, False)
+
         return losses
 
     def compute_loss(self, d_out, target):
@@ -255,6 +258,29 @@ def compute_grad2(d_out, x_in):
     assert (grad_dout2.size() == x_in.size())
     reg = grad_dout2.view(batch_size, -1).sum(1)
     return reg
+
+def update_average(model_tgt, model_src, beta):
+    toggle_grad(model_src, False)
+    toggle_grad(model_tgt, False)
+
+    param_dict_src = dict(model_src.named_parameters())
+
+    for p_name, p_tgt in model_tgt.named_parameters():
+        p_src = param_dict_src[p_name]
+        assert (p_src is not p_tgt)
+        p_tgt.copy_(beta * p_tgt + (1. - beta) * p_src)
+
+
+    # for p_ema, p in zip(model_tgt.parameters(), model_src.parameters()):
+    #     p_ema.copy_(p)
+    # for b_ema, b in zip(model_tgt.buffers(), model_src.buffers()):
+    #     b_ema.copy_(b)
+
+    param_dict_src_buffer = dict(model_src.named_buffers())
+    for b_name, b_tgt in model_tgt.named_buffers():
+        b_src = param_dict_src_buffer[b_name]
+        assert (b_src is not b_tgt)
+        b_tgt.copy_(b_src)
 
 class VGG19(torch.nn.Module):
     def __init__(self, requires_grad=False):

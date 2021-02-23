@@ -14,7 +14,7 @@ from torch.nn import init
 
 from gan_training import utils
 
-from gan_training.train_BiGAN import Trainer
+from gan_training.train_BiGAN import Trainer, update_average
 from gan_training.logger import Logger
 from gan_training.checkpoints import CheckpointIO
 from gan_training.inputs import get_dataset
@@ -184,7 +184,6 @@ def main():
     checkpoint_io.register_modules(decoder=decoder,
                                    encoder=encoder,
                                    label_generator = label_generator,
-
                                    discriminator= discriminator,
                                    qhead_discriminator=qhead_discriminator,
                                    disc_optimizer=disc_optimizer,
@@ -212,30 +211,36 @@ def main():
     utils.save_images(x_test, path.join(out_dir, 'real.png'))
     logger.add_imgs(x_test, 'gt', 0)
 
-
-
-
-    # Test decoder
-    if config['training']['take_model_average']:
-        print('Taking model average')
-        bad_modules = [nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d]
-        for model in [decoder, encoder]:
-            for name, module in model.named_modules():
-                for bad_module in bad_modules:
-                    if isinstance(module, bad_module):
-                        print('Batch norm in encoder not compatible with exponential moving average')
-                        exit()
-        decoder_test = copy.deepcopy(decoder)
-        checkpoint_io.register_modules(decoder_test=decoder_test)
-    else:
-        decoder_test = decoder
-
-
     decoder.apply(init_weights)
     encoder.apply(init_weights)
     discriminator.apply(init_weights)
     label_generator.apply(init_weights)
     qhead_discriminator.apply(init_weights)
+
+    # Test decoder
+    if config['training']['take_model_average']:
+        print('Taking model average')
+        bad_modules = [nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d]
+        for model in [decoder, label_generator]:
+            for name, module in model.named_modules():
+                for bad_module in bad_modules:
+                    if isinstance(module, bad_module):
+                        print(f'Batch norm in {model.module.__class__.__name__} not compatible with exponential moving average')
+                        #exit()
+
+        decoder_test = copy.deepcopy(decoder)
+        checkpoint_io.register_modules(decoder_test=decoder_test)
+        # decoder_test = decoder
+
+        label_generator_test = copy.deepcopy(label_generator)
+        checkpoint_io.register_modules(label_generator_test=label_generator_test)
+        # label_generator_test = label_generator
+    else:
+        decoder_test = decoder
+        label_generator_test = label_generator
+
+
+
 
     # Load checkpoint if it exists
     it = utils.get_most_recent(checkpoint_dir, 'model') if args.model_it == -1 else args.model_it
@@ -247,12 +252,12 @@ def main():
         encoder,
         zdist,
         zdist_lab,
-        label_generator = label_generator,
+        label_generator = label_generator_test,
         train_loader=train_loader,
         batch_size=batch_size,
         device=device,
         inception_nsamples=config['training']['inception_nsamples'],
-    n_locallabels=config['encoder']['n_locallabels'])
+        n_locallabels=config['encoder']['n_locallabels'])
 
     # Trainer
     # print(label_discriminator)
@@ -273,8 +278,6 @@ def main():
                       reg_type=config['training']['reg_type'],
                       reg_param=config['training']['reg_param']
                       )
-    print(config['training']['lambda_LabConLoss'],
-          )
 
     if args.eval_mode:
         # test with same z_img, different segmentations
@@ -297,21 +300,19 @@ def main():
             x = torch.cat((torch.unsqueeze(x_c[0].float().cuda(),dim=0), x), dim = 0)
             logger.add_imgs(x, 'sameZLab', i)
         sys.exit()
-    # Training loop
+
     # see_cluster_frequency(train_loader, encoder)
     print('Start training...')
+    # for param_group in encdec_optimizer.param_groups:
+    #     lr = param_group['lr']
+    #     if epoch_idx >= args.niterBeforeLRDecay:
+    #         lr = lr*2
 
-    for param_group in encdec_optimizer.param_groups:
-        lr = param_group['lr']
-        if epoch_idx >= args.niterBeforeLRDecay:
-            lr = lr*2
-        print("lr in optim", lr, epoch_idx)
-
-
+    # Training loop
     while it < args.nepochs * len(train_loader):
         epoch_idx += 1
-        lr = update_learning_rate(epoch_idx, lr, encdec_optimizer, disc_optimizer)
-        print(lr)
+        # lr = update_learning_rate(epoch_idx, lr, encdec_optimizer, disc_optimizer)
+
         for x_real, y in train_loader:
             it += 1
 
@@ -323,6 +324,10 @@ def main():
             gloss = trainer.encoderdecoder_trainstep(x_real, z, z_lab=z_lab, check_norm = (it%200 ==0))
 
             dloss = trainer.discriminator_trainstep(x_real, z, z_lab)
+
+            if config['training']['take_model_average']:
+                update_average(decoder_test, decoder, beta=config['training']['model_average_beta'])
+                update_average(label_generator_test, label_generator, beta=config['training']['model_average_beta'])
 
             for key, value in gloss.items():
                 logger.add('losses', key, value, it=it)
@@ -347,6 +352,10 @@ def main():
                 x,_ = evaluator.create_samples_labelGen(z_test, z_lab, out_dir=out_dir)
                 logger.add_imgs(x, 'all', it+1)
 
+                with torch.no_grad():
+                    _, label_map = label_generator(z_lab)
+                    x_fake = decoder(seg=label_map, input=z_test)
+                    logger.add_imgs(x_fake, 'all', it + 3)
 
             # (ii) Compute inception if necessary
             if (it - 1) % inception_every == 0 and it > 1 and False or it == 5001:
@@ -363,12 +372,10 @@ def main():
 
 
             # (iii) Backup if necessary
-            if it % backup_every == 0 or it ==1000:
+            if it % backup_every == 0 or it ==500 or it==1000:
                 print('Saving backup...')
                 checkpoint_io.save('model_%08d.pt' % it, it=it, epoch_idx = epoch_idx)
-
                 logger.save_stats('stats_%08d.p' % it)
-
                 if it > 0:
                     checkpoint_io.save('model.pt', it=it)
 

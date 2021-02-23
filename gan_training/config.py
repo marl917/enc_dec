@@ -68,6 +68,7 @@ def build_models(config):
                       deterministicOnSeg = config['decoder']['deterministicOnSeg'],
                       local_nlabels=config['decoder']['n_locallabels'],
                       size=config['data']['img_size'],
+                      label_size=config['label_generator']['label_size'],
                       **config['decoder']['kwargs'])
 
     encoder = Encoder(
@@ -103,7 +104,7 @@ def build_models(config):
                   nlabels=config['discriminator']['nlabels'],
                   local_nlabels=config['discriminator']['n_locallabels'],
                   size=config['label_generator']['label_size'],
-                  qhead_variant = not config['decoder']['deterministicOnSeg'],
+                  qhead_variant = True,
                   **config['discriminator']['kwargs'])
 
     return decoder, encoder, discriminator, label_generator, qhead_discriminator

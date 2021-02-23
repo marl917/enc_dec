@@ -5,7 +5,7 @@ from torch.nn import functional as F
 import torch.nn.utils.spectral_norm as spectral_norm
 
 class SPADEResnetBlock(nn.Module):
-    def __init__(self, fin, fout, local_nlabels):
+    def __init__(self, fin, fout, local_nlabels, detOnSeg):
         super().__init__()
         # Attributes
         self.learned_shortcut = (fin != fout)
@@ -25,20 +25,17 @@ class SPADEResnetBlock(nn.Module):
             self.conv_s = spectral_norm(self.conv_s)
 
         # define normalization layers
-
-        self.norm_0 = SPADE(fin, local_nlabels)
-        self.norm_1 = SPADE( fmiddle, local_nlabels)
+        self.norm_0 = SPADE(fin, local_nlabels, detOnSeg)
+        self.norm_1 = SPADE( fmiddle, local_nlabels,detOnSeg)
         if self.learned_shortcut:
-            self.norm_s = SPADE(fin, local_nlabels)
+            self.norm_s = SPADE(fin, local_nlabels,detOnSeg)
 
     # note the resnet block with SPADE also takes in |seg|,
     # the semantic segmentation map as input
     def forward(self, x, seg):
         x_s = self.shortcut(x, seg)
-
         dx = self.conv_0(self.actvn(self.norm_0(x, seg)))
         dx = self.conv_1(self.actvn(self.norm_1(dx, seg)))
-
         out = x_s + dx
 
         return out
@@ -54,10 +51,13 @@ class SPADEResnetBlock(nn.Module):
         return F.leaky_relu(x, 2e-1)
 
 class SPADE(nn.Module):
-    def __init__(self, norm_nc, label_nc):
+    def __init__(self, norm_nc, label_nc,detOnSeg):
         super().__init__()
         ks = 3
-        self.param_free_norm = nn.BatchNorm2d(norm_nc, affine=False)
+        if detOnSeg:
+            self.param_free_norm = nn.InstanceNorm2d(norm_nc, affine=False)
+        else:
+            self.param_free_norm = nn.BatchNorm2d(norm_nc, affine=False)
 
         # The dimension of the intermediate embedding space. Yes, hardcoded.
         nhidden = 128
@@ -76,8 +76,6 @@ class SPADE(nn.Module):
         normalized = self.param_free_norm(x)
 
         # Part 2. produce scaling and bias conditioned on semantic map
-
-
         segmap = F.interpolate(segmap, size=x.size()[2:], mode='bilinear', align_corners=True)
         actv = self.mlp_shared(segmap)
         gamma = self.mlp_gamma(actv)

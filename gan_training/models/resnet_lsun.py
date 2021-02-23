@@ -9,6 +9,74 @@ from gan_training.models import blocks
 from gan_training.models.blocks import ResnetBlock
 from torch.nn.utils.spectral_norm import spectral_norm
 
+class smallDecoder(nn.Module):
+    def __init__(self,
+                 nlabels,
+                 local_nlabels=0,
+                 z_dim=128,
+                 nc=3,
+                 ngf=64,
+                 embed_dim=256,
+                 deterministicOnSeg=False,
+                 size=0,
+                 label_size = 0,
+                 **kwargs):
+        super(smallDecoder, self).__init__()
+
+        self.sw = size // (2 ** 4)
+        self.sh = self.sw  # assumption of square images
+
+        self.deterministicOnSeg = deterministicOnSeg
+        print("Decoder only depends on Segmentation : ", self.deterministicOnSeg)
+
+        self.get_latent = blocks.Identity()
+        if self.deterministicOnSeg:
+            nc_noise=1
+            self.fc_noise = nn.Linear(z_dim, label_size * label_size * nc_noise)
+            self.fc_img = nn.Conv2d(local_nlabels + nc_noise, ngf * 8, 3, padding=1)
+            self.label_size = label_size
+            local_nlabels += nc_noise  # to remove if no noise included in seg
+        else:
+            self.fc = nn.Linear(z_dim, self.sh * self.sw * ngf * 8)
+
+        self.up = nn.Upsample(scale_factor=2)
+
+        self.up_0 = blocks.SPADEResnetBlock(8 * ngf, 8 * ngf, local_nlabels, self.deterministicOnSeg)
+        self.up_1 = blocks.SPADEResnetBlock(8 * ngf, 4 * ngf, local_nlabels,self.deterministicOnSeg)
+        self.up_2 = blocks.SPADEResnetBlock(4 * ngf, 2 * ngf, local_nlabels,self.deterministicOnSeg)
+        self.up_3 = blocks.SPADEResnetBlock(2 * ngf, 1 * ngf, local_nlabels,self.deterministicOnSeg)
+        self.conv_img = nn.Conv2d(ngf, 3, 3, padding=1)
+
+    def forward(self, seg, input=None):  #input=z
+        #y = y.clamp(None, self.global_nlabels - 1)
+
+        if self.deterministicOnSeg:
+            out = self.get_latent(input)
+
+            out = self.fc_noise(out)
+            out = out.view(out.size(0), -1, self.label_size, self.label_size)
+            seg = torch.cat((seg, out), dim=1)
+            out = F.interpolate(seg, size=(self.sh, self.sw))
+            out = self.fc_img(out)
+
+        else:
+            out = self.get_latent(input)
+            # print("out size in decoder : ", out.size())
+            out = self.fc(out)
+            out = out.view(out.size(0), -1, self.sh, self.sw)
+
+        x = self.up_0(out, seg)
+        x = self.up(x)
+        x = self.up_1(x, seg)
+        x = self.up(x)
+        x = self.up_2(x, seg)
+        x = self.up(x)
+        x = self.up_3(x, seg)
+        x = self.up(x)
+        x = self.conv_img(F.leaky_relu(x, 2e-1))
+        x = torch.tanh(x)
+        return x
+
 class Decoder(nn.Module):
     def __init__(self,
                  nlabels,
@@ -19,6 +87,7 @@ class Decoder(nn.Module):
                  embed_dim=256,
                  deterministicOnSeg=False,
                  size=0,
+                 label_size = 0,
                  **kwargs):
         super(Decoder, self).__init__()
 
@@ -30,35 +99,45 @@ class Decoder(nn.Module):
 
         self.get_latent = blocks.Identity()
         if self.deterministicOnSeg:
-            self.fc = nn.Conv2d(local_nlabels, ngf * 16, 3, padding=1)
+            nc_noise=1
+            self.fc_noise = nn.Linear(z_dim, label_size * label_size * nc_noise)
+            self.fc_img = nn.Conv2d(local_nlabels + nc_noise, ngf * 16, 3, padding=1)
+            self.label_size = label_size
+            local_nlabels += nc_noise  # to remove if no noise included in seg
         else:
             self.fc = nn.Linear(z_dim, self.sh * self.sw * ngf * 16)
 
         self.up = nn.Upsample(scale_factor=2)
 
-        self.head_0 = blocks.SPADEResnetBlock(16 * ngf, 16 * ngf, local_nlabels)
 
-        self.G_middle_0 = blocks.SPADEResnetBlock(16 * ngf, 16 * ngf,local_nlabels)
-        self.G_middle_1 = blocks.SPADEResnetBlock(16 * ngf, 16 * ngf, local_nlabels)
+        self.head_0 = blocks.SPADEResnetBlock(16 * ngf, 16 * ngf, local_nlabels,self.deterministicOnSeg)
 
-        self.up_0 = blocks.SPADEResnetBlock(16 * ngf, 8 * ngf, local_nlabels)
-        self.up_1 = blocks.SPADEResnetBlock(8 * ngf, 4 * ngf, local_nlabels)
-        self.up_2 = blocks.SPADEResnetBlock(4 * ngf, 2 * ngf, local_nlabels)
-        self.up_3 = blocks.SPADEResnetBlock(2 * ngf, 1 * ngf, local_nlabels)
+        self.G_middle_0 = blocks.SPADEResnetBlock(16 * ngf, 16 * ngf,local_nlabels,self.deterministicOnSeg)
+        self.G_middle_1 = blocks.SPADEResnetBlock(16 * ngf, 16 * ngf, local_nlabels,self.deterministicOnSeg)
+
+        self.up_0 = blocks.SPADEResnetBlock(16 * ngf, 8 * ngf, local_nlabels,self.deterministicOnSeg)
+        self.up_1 = blocks.SPADEResnetBlock(8 * ngf, 4 * ngf, local_nlabels,self.deterministicOnSeg)
+        self.up_2 = blocks.SPADEResnetBlock(4 * ngf, 2 * ngf, local_nlabels,self.deterministicOnSeg)
+        self.up_3 = blocks.SPADEResnetBlock(2 * ngf, 1 * ngf, local_nlabels,self.deterministicOnSeg)
         self.conv_img = nn.Conv2d(ngf, 3, 3, padding=1)
 
     def forward(self, seg, input=None):  #input=z
         #y = y.clamp(None, self.global_nlabels - 1)
 
         if self.deterministicOnSeg:
+            out = self.get_latent(input)
+
+            out = self.fc_noise(out)
+            out = out.view(out.size(0), -1, self.label_size, self.label_size)
+            seg = torch.cat((seg, out), dim=1)
             out = F.interpolate(seg, size=(self.sh, self.sw))
-            out = self.fc(out)
+            out = self.fc_img(out)
+
         else:
             out = self.get_latent(input)
             # print("out size in decoder : ", out.size())
             out = self.fc(out)
             out = out.view(out.size(0), -1, self.sh, self.sw)
-
 
         x = self.head_0(out, seg)
         x = self.up(x)
@@ -99,6 +178,7 @@ class Encoder(nn.Module):
         self.modified = deeper_arch
 
         bn = blocks.BatchNorm2d
+        # bn = nn.InstanceNorm2d
 
         self.conv_img = nn.Conv2d(3, 1 * nf, 3, padding=1)
 
@@ -181,155 +261,6 @@ class Encoder(nn.Module):
 
         return label_map_unorm, label_map
 
-
-# class Encoder(nn.Module):
-#     def __init__(self,
-#                  nlabels,
-#                  local_nlabels=None,
-#                  nc=3,
-#                  ndf=64,
-#                  pack_size=1,
-#                  features='penultimate',
-#                  **kwargs):
-#
-#         super(Encoder, self).__init__()
-#
-#         #assert conditioning != 'unconditional' or nlabels == 1
-#
-#         self.FloatTensor = torch.cuda.FloatTensor if True \
-#             else torch.FloatTensor  #is_cuda
-#
-#         self.local_nlabels = local_nlabels
-#
-#         self.conv1 = nn.Sequential(nn.Conv2d(nc * pack_size, ndf, 3, 1, 1), nn.LeakyReLU(0.1))
-#         self.conv2 = nn.Sequential(nn.Conv2d(ndf, ndf, 4, 2, 1), nn.LeakyReLU(0.1))
-#         self.conv3 = nn.Sequential(nn.Conv2d(ndf, ndf * 2, 3, 1, 1), nn.LeakyReLU(0.1))
-#         self.conv4 = nn.Sequential(nn.Conv2d(ndf * 2, ndf * 2, 4, 2, 1), nn.LeakyReLU(0.1))
-#         self.conv5 = nn.Sequential(nn.Conv2d(ndf * 2, ndf * 4, 4, 2, 1), nn.LeakyReLU(0.1))
-#
-#
-#         self.local_FeatureMapping = blocks.local_FeatureMapping(num_classes=self.local_nlabels,
-#                                                                 n_channels=ndf * 4)  # modified : remove dilatation
-#         self.logSoftmax = nn.LogSoftmax(dim=1)
-#
-#
-#         self.features = features
-#         self.pack_size = pack_size
-#         print(f'Getting features from {self.features}')
-#
-#     def sample_gumbel(self, shape, eps=1e-20):
-#         U = torch.rand(shape).cuda()
-#         return -Variable(torch.log(-torch.log(U + eps) + eps))
-#
-#     def gumbel_softmax_sample(self, logits, temperature):
-#         y = logits + self.sample_gumbel(logits.size())
-#         return F.softmax(y / temperature, dim=1), y
-#
-#     def gumble_softmax(self, logits):
-#         y, y_unorm = self.gumbel_softmax_sample(logits, temperature=1.0)
-#         x = torch.argmax(y, dim=1)
-#         x = torch.unsqueeze(x, dim=1)
-#         bs, _, h, w = x.size()
-#         input_label = self.FloatTensor(bs, self.local_nlabels, h, w).zero_()
-#         y_hard = input_label.scatter_(1, x.long().cuda(), 1.0)
-#         return (y_hard - y).detach() + y, y_unorm
-#
-#
-#     def forward(self, input):
-#         out = self.conv1(input)
-#         out = self.conv2(out)
-#         out = self.conv3(out)
-#         out = self.conv4(out)
-#         out = self.conv5(out)  #out of size bs * 256 * 8 * 8
-#         out = self.local_FeatureMapping(out)#local classifier for discriminator loss : map the features to K_2 classifiers : size K_2 * 8 * 8 label map
-#
-#
-#         logits = self.logSoftmax(out)
-#         label_map, label_map_unorm = self.gumble_softmax(logits)
-#
-#         return label_map_unorm, label_map
-
-# class LabelGenerator(nn.Module):
-#     def __init__(self,
-#                  nlabels,
-#                  conditioning,
-#                  z_dim=128,
-#                  local_nlabels=0,
-#                  ngf=64,
-#                  embed_dim=256,
-#                  label_size=0,
-#                  **kwargs):
-#         super(LabelGenerator, self).__init__()
-#         size = 8
-#         assert conditioning != 'unconditional' or nlabels == 1
-#         self.sw = size // (2 ** 2)
-#         self.sh = self.sw
-#
-#         nc= local_nlabels
-#
-#         if conditioning == 'embedding':
-#             self.get_latent = blocks.LatentEmbeddingConcat(nlabels, embed_dim)
-#             self.fc = nn.Linear(z_dim + embed_dim, self.sh*self.sw * ngf * 8)
-#         elif conditioning == 'unconditional':
-#             self.get_latent = blocks.Identity()
-#             self.fc = nn.Linear(z_dim, self.sh*self.sw * ngf * 8)
-#         else:
-#             raise NotImplementedError(
-#                 f"{conditioning} not implemented for generator")
-#
-#         bn = blocks.BatchNorm2d
-#
-#         self.nlabels = nlabels
-#         self.local_nlabels = local_nlabels
-#
-#         self.conv1 = nn.ConvTranspose2d(ngf * 8, ngf * 8, 4, 2, 1)
-#         self.bn1 = bn(ngf * 8, nlabels)
-#
-#         self.conv1bis = nn.ConvTranspose2d(ngf * 8, ngf * 4, 3, 1, 1)
-#         self.bn1bis = bn(ngf * 4, nlabels)
-#
-#         self.conv2 = nn.ConvTranspose2d(ngf * 4, ngf * 4, 4, 2, 1)
-#         self.bn2 = bn(ngf * 4, nlabels)
-#
-#         self.conv2bis = nn.ConvTranspose2d(ngf * 4, ngf * 2, 3, 1, 1)
-#         self.bn2bis = bn(ngf * 2, nlabels)
-#
-#
-#         self.conv_out = nn.Sequential(nn.Conv2d(ngf*2, nc, 3, 1, 1), nn.LogSoftmax(dim=1))
-#
-#         self.FloatTensor = torch.cuda.FloatTensor if True \
-#             else torch.FloatTensor  # is_cuda
-#
-#     def sample_gumbel(self, shape, eps=1e-20):
-#         U = torch.rand(shape).cuda()
-#         return -Variable(torch.log(-torch.log(U + eps) + eps))
-#
-#     def gumbel_softmax_sample(self, logits, temperature):
-#         y = logits + self.sample_gumbel(logits.size())
-#         return F.softmax(y / temperature, dim=1), y
-#
-#     def gumble_softmax(self, logits):
-#         y, y_unorm= self.gumbel_softmax_sample(logits, temperature=1.0)
-#         x = torch.argmax(y, dim=1)
-#         x = torch.unsqueeze(x, dim=1)
-#         bs, _, h, w = x.size()
-#         input_label = self.FloatTensor(bs, self.local_nlabels, h, w).zero_()
-#         y_hard = input_label.scatter_(1, x.long().cuda(), 1.0)
-#         return (y_hard - y).detach() + y, y_unorm
-#
-#     def forward(self, input, y=None):
-#         out = self.get_latent(input, y)
-#         out = self.fc(out)
-#
-#         out = out.view(out.size(0), -1, self.sh, self.sw)
-#         out = F.relu(self.bn1(self.conv1(out), y))
-#         out = F.relu(self.bn1bis(self.conv1bis(out), y))
-#         out = F.relu(self.bn2(self.conv2(out), y))
-#         out = F.relu(self.bn2bis(self.conv2bis(out), y))
-#         logits = self.conv_out(out)
-#         label_map, y_unorm = self.gumble_softmax(logits)
-#         return y_unorm, label_map
-
 class LabelGenerator(nn.Module):
     def __init__(self,
                  z_dim,
@@ -352,19 +283,15 @@ class LabelGenerator(nn.Module):
 
         #either use conditional batch norm, or use no batch norm
         bn = blocks.BatchNorm2d
-        # bn = blocks.BatchNorm2d
+        # bn = nn.InstanceNorm2d
         print("INIT LABEL GENERATOR")
         self.modified = deeper_arch
         if not self.modified:
             s0 = self.s0 = label_size // 4
             self.fc = nn.Linear(z_dim, 8 * nf * s0 * s0,bn)
 
-            self.resnet_0_0 = ResnetBlock(8 * nf, 8 * nf,bn)
             self.resnet_1_0 = ResnetBlock(8 * nf, 4 * nf,bn)
-
-            self.resnet_2_0 = ResnetBlock(4 * nf, 4 * nf,bn)
             self.resnet_4_0 = ResnetBlock(4 * nf, 2 * nf,bn)
-
             self.resnet_5_0 = ResnetBlock(2 * nf, 1 * nf,bn)
 
         else:
@@ -429,10 +356,8 @@ class LabelGenerator(nn.Module):
         out = self.fc(z)
         if not self.modified:
             out = out.view(z.size(0), 8 * self.nf, self.s0, self.s0)
-            out = self.resnet_0_0(out)
             out = self.resnet_1_0(out)
             out = F.interpolate(out, scale_factor=2)
-            out = self.resnet_2_0(out)
             out = self.resnet_4_0(out)
             out = F.interpolate(out, scale_factor=2)
             out = actvn(self.resnet_5_0(out))
@@ -718,9 +643,6 @@ class BiGANDiscriminator(nn.Module):
 #             input = self.fc_out_img(input)
 #             # print("img path", input.size(), xseg.size())
 #             return forQdisc, xseg, input
-
-
-
 class BiGANQHeadDiscriminator(nn.Module):
     def __init__(self,
                  nlabels,
@@ -740,25 +662,7 @@ class BiGANQHeadDiscriminator(nn.Module):
         # self.conv1 = nn.Conv2d(ndf *16, 512, 8, bias=False)
         #
         # self.bn1 = nn.BatchNorm2d(512)
-        if not qhead_variant:
-            # bn=blocks.Identity
-            # self.resnet_0_0 = ResnetBlock(512, 256,bn = bn)
-            # self.resnet_0_1 = ResnetBlock(256, 128,bn = bn)
-            # self.conv2 = nn.Conv2d(128, 128, size, bias = False)
-            # self.bn2 = nn.BatchNorm2d(128)
-
-            self.conv2 = nn.Conv2d(512, 256, 3,1,1)
-            self.bn2 = nn.BatchNorm2d(256)
-            self.conv3 = nn.Conv2d(256, 128, 4,2,1)
-            self.bn3 = nn.BatchNorm2d(128)
-            self.conv4 = nn.Conv2d(128, 128,size//2 , bias = False )
-            self.bn4 = nn.BatchNorm2d(128)
-
-
-            self.conv_mu = nn.Conv2d(128, z_dim_lab, 1)
-            self.conv_var = nn.Conv2d(128, z_dim_lab, 1)
-            print("2nd Qhead discriminator with only label map z to recover")
-        else:
+        if qhead_variant:
             self.conv2_lab = nn.Conv2d(512, 256, 3, 1, 1)
             self.bn2_lab = nn.BatchNorm2d(256)
             self.conv3_lab = nn.Conv2d(256, 128, 4, 2, 1)
@@ -807,16 +711,6 @@ class BiGANQHeadDiscriminator(nn.Module):
             var_img = torch.exp(self.conv_var_img(x_img).squeeze())
 
             return mu_lab, var_lab, mu_img, var_img
-
-        else:
-            # x = self.resnet_0_0(x)
-            # x = self.resnet_0_1(x)
-            x = F.leaky_relu(self.bn2(self.conv2(x)), 0.1, inplace=True)
-            x = F.leaky_relu(self.bn3(self.conv3(x)), 0.1, inplace=True)
-            x = F.leaky_relu(self.bn4(self.conv4(x)), 0.1, inplace=True)
-            mu = self.conv_mu(x).squeeze()
-            var = torch.exp(self.conv_var(x).squeeze())
-            return mu, var
 
 def actvn(x):
     out = F.leaky_relu(x, 2e-1)
