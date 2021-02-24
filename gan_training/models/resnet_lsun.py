@@ -462,9 +462,9 @@ class BiGANDiscriminator(nn.Module):
                                         nn.LeakyReLU(0.2, inplace=True),
                                         )
         elif self.noSegPath == 3:
-            self.conv1z = nn.Sequential(nn.Conv2d(self.local_nlabels, ndf * 2, 3, 1, padding=1, bias=False),
+            self.conv1z = nn.Sequential(nn.Conv2d(self.local_nlabels, ndf * 4, 3, 1, padding=1, bias=False),
                                         nn.LeakyReLU(0.2, inplace=True),
-                                        nn.Conv2d(ndf * 2, ndf * 4, 1, 1, padding=0, bias=False))
+                                        nn.Conv2d(ndf * 4, ndf * 8, 1, 1, padding=0, bias=False))
 
         #joint inference
         if not self.noSegPath:
@@ -481,7 +481,7 @@ class BiGANDiscriminator(nn.Module):
             elif self.noSegPath ==2:
                 input_nc_seg = ndf*8
             elif self.noSegPath ==3:
-                input_nc_seg = ndf*4
+                input_nc_seg = ndf*8
             self.conv1xz = nn.Sequential(nn.Conv2d(ndf * 8 + input_nc_seg, ndf * 16, 1, stride=1, bias=False),
                                      nn.LeakyReLU(0.2, inplace=True))
             self.conv2xz = nn.Sequential(nn.Conv2d(ndf * 16, ndf * 16, 1, stride=1, bias=False), nn.LeakyReLU(0.2, inplace=True))
