@@ -12,7 +12,8 @@ encoder_dict = {
     'dcgan_deep_onlylocal_clust':dcgan_deep_onlylocal_clust.Encoder,
     'resnet': resnet.Encoder,
     'resnet_lsun': resnet_lsun.Encoder,
-    'resnet_lsun256': resnet_lsun256.Encoder
+    'resnet_lsun256': resnet_lsun256.Encoder,
+    'resnet_lsun_small': resnet_lsun.smallEncoder
 }
 
 

@@ -186,10 +186,6 @@ class Trainer(object):
         else:
             dloss_real.backward()
 
-
-
-
-
         # On fake data
         with torch.no_grad():
             seg_fake_unorm, seg_fake = self.label_generator(z_lab)

@@ -157,7 +157,7 @@ class Decoder(nn.Module):
         x = torch.tanh(x)
         return x
 
-class Encoder(nn.Module):
+class smallEncoder(nn.Module):
     def __init__(self,
                  nlabels,
                  local_nlabels,
@@ -167,7 +167,7 @@ class Encoder(nn.Module):
                  features='penultimate',
                  deeper_arch=False,
                  **kwargs):
-        super(Encoder, self).__init__()
+        super(smallEncoder, self).__init__()
         # s0 = self.s0 = img_size // 32
         print("img size in encoder :", img_size)
         nf = self.nf = nfilter
@@ -179,6 +179,98 @@ class Encoder(nn.Module):
 
         bn = blocks.BatchNorm2d
         # bn = nn.InstanceNorm2d
+
+        self.conv_img = nn.Conv2d(3, 1 * nf, 3, padding=1)
+
+        # self.resnet_0_0 = ResnetBlock(1 * nf, 1 * nf, bn)
+        self.resnet_0_1 = ResnetBlock(1 * nf, 2 * nf, bn)
+
+        # self.resnet_1_0 = ResnetBlock(2 * nf, 2 * nf, bn)
+        self.resnet_1_1 = ResnetBlock(2 * nf, 4 * nf, bn)
+
+        # self.resnet_2_0 = ResnetBlock(4 * nf, 4 * nf, bn)
+        self.resnet_2_1 = ResnetBlock(4 * nf, 8 * nf, bn)
+
+        # self.resnet_3_0 = ResnetBlock(8 * nf, 8 * nf, bn)
+        # self.resnet_3_1 = ResnetBlock(8 * nf, 16 * nf, bn)
+        #
+        # self.resnet_4_0 = ResnetBlock(16 * nf, 16 * nf, bn)
+        # self.resnet_4_1 = ResnetBlock(16 * nf, 16 * nf, bn)
+
+        self.local_FeatureMapping = blocks.local_FeatureMapping(num_classes=self.local_nlabels, n_channels=8*nf)
+
+        self.logSoftmax = nn.LogSoftmax(dim=1)
+        self.FloatTensor = torch.cuda.FloatTensor
+
+    def sample_gumbel(self, shape, logits, eps=1e-20):
+        U = logits.new(shape).uniform_(0, 1)  # = torch.rand(shape).cuda()
+        return -Variable(torch.log(-torch.log(U + eps) + eps))
+
+    def gumbel_softmax_sample(self, logits, temperature):
+        y = logits + self.sample_gumbel(logits.size(), logits)
+        return F.softmax(y / temperature, dim=1), y
+
+    def gumble_softmax(self, logits):
+        y, y_unorm = self.gumbel_softmax_sample(logits, temperature=1.0)
+        x = torch.argmax(y, dim=1)
+        x = torch.unsqueeze(x, dim=1)
+        bs, _, h, w = x.size()
+        # print("local n labels  : ", self.local_nlabels, torch.min(x), torch.max(x))
+        input_label = self.FloatTensor(bs, self.local_nlabels, h, w).zero_()
+        y_hard = input_label.scatter_(1, x.long().cuda(), 1.0)
+        return (y_hard - y).detach() + y, y_unorm
+
+    def forward(self, x):
+        out = self.conv_img(x)
+
+        # out = self.resnet_0_0(out)
+        out = self.resnet_0_1(out)
+        out = F.avg_pool2d(out, 3, stride=2, padding=1)
+        # out = self.resnet_1_0(out)
+        out = self.resnet_1_1(out)
+
+        # out = self.resnet_2_0(out)
+        out = self.resnet_2_1(out)
+        out = F.avg_pool2d(out, 3, stride=2, padding=1)
+        # out = self.resnet_3_0(out)
+        # out = self.resnet_3_1(out)
+
+        # out = self.resnet_4_0(out)
+        # out = self.resnet_4_1(out)
+
+        out = actvn(out)
+        out = self.local_FeatureMapping(out)
+
+        logits = self.logSoftmax(out)
+        label_map, label_map_unorm = self.gumble_softmax(logits)
+
+        return label_map_unorm, label_map
+
+class Encoder(nn.Module):
+    def __init__(self,
+                 nlabels,
+                 local_nlabels,
+                 img_size,
+                 label_size =0,
+                 nfilter=64,
+                 features='penultimate',
+                 deeper_arch=False,
+                 batchnorm=True,
+                 **kwargs):
+        super(Encoder, self).__init__()
+        # s0 = self.s0 = img_size // 32
+        print("img size in encoder :", img_size)
+        nf = self.nf = nfilter
+        self.nlabels = nlabels
+        self.local_nlabels = local_nlabels
+        self.img_size =img_size
+        self.label_size = label_size
+        self.modified = deeper_arch
+
+        if batchnorm:
+            bn = blocks.BatchNorm2d
+        else:
+            bn = nn.InstanceNorm2d
 
         self.conv_img = nn.Conv2d(3, 1 * nf, 3, padding=1)
 
@@ -270,6 +362,7 @@ class LabelGenerator(nn.Module):
                  conditioning=None,
                  nfilter=64,
                  deeper_arch=False,
+                 batchnorm=True,
                  **kwargs):
         super(LabelGenerator, self).__init__()
 
@@ -282,8 +375,10 @@ class LabelGenerator(nn.Module):
 
 
         #either use conditional batch norm, or use no batch norm
-        bn = blocks.BatchNorm2d
-        # bn = nn.InstanceNorm2d
+        if batchnorm:
+            bn = blocks.BatchNorm2d
+        else:
+            bn = nn.InstanceNorm2d
         print("INIT LABEL GENERATOR")
         self.modified = deeper_arch
         if not self.modified:
