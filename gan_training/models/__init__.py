@@ -22,7 +22,8 @@ discriminator_dict = {
     'dcgan_deep_onlylocal_clust_LocalGlob': dcgan_deep_onlylocal_clust.LocalAndGlobalDiscriminator,
     'resnet': resnet.BiGANDiscriminator,
     'resnet_lsun': resnet_lsun.BiGANDiscriminator,
-    'resnet_lsun256': resnet_lsun256.BiGANDiscriminator
+    'resnet_lsun256': resnet_lsun256.BiGANDiscriminator,
+    'resnet_lsun_small': resnet_lsun.smallBiGANDiscriminator
 }
 
 label_generator_dict = {

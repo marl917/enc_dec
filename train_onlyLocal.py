@@ -220,14 +220,13 @@ def main():
     # Test decoder
     if config['training']['take_model_average']:
         print('Taking model average')
-        bad_modules = [nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d]
-        for model in [decoder, label_generator]:
-            for name, module in model.named_modules():
-                for bad_module in bad_modules:
-                    if isinstance(module, bad_module):
-                        print(f'Batch norm in {model.module.__class__.__name__} not compatible with exponential moving average')
+        # bad_modules = [nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d]
+        # for model in [decoder, label_generator]:
+        #     for name, module in model.named_modules():
+        #         for bad_module in bad_modules:
+        #             if isinstance(module, bad_module):
+        #                 print(f'Batch norm in {model.module.__class__.__name__} not compatible with exponential moving average')
                         #exit()
-
         decoder_test = copy.deepcopy(decoder)
         checkpoint_io.register_modules(decoder_test=decoder_test)
         # decoder_test = decoder

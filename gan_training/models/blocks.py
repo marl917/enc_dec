@@ -127,7 +127,6 @@ class ResnetBlock(nn.Module):
         #     self.bn0 = Identity(self.fin)
         #     self.bn1 = Identity(self.fhidden)
         # else:
-        print(bn)
         self.bn0 = bn(self.fin)
         self.bn1 = bn(self.fhidden)
 

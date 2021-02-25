@@ -98,13 +98,13 @@ def build_models(config):
                       **config['label_generator']['kwargs'])
 
 
-    Qhead_discriminator = qhead_discriminator_dict[config['discriminator']['name']]
+    Qhead_discriminator = qhead_discriminator_dict[config['qhead_discriminator']['name']]
     qhead_discriminator = Qhead_discriminator(z_dim_lab=config['label_generator']['zdim'],
                                               z_dim_img = config['z_dist']['dim'],
                   nlabels=config['discriminator']['nlabels'],
                   local_nlabels=config['discriminator']['n_locallabels'],
                   size=config['label_generator']['label_size'],
-                  qhead_variant = True,
+                  qhead_variant = config['discriminator']['name'] == 'resnet_lsun_small',
                   **config['discriminator']['kwargs'])
 
     return decoder, encoder, discriminator, label_generator, qhead_discriminator

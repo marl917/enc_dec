@@ -166,6 +166,7 @@ class smallEncoder(nn.Module):
                  nfilter=64,
                  features='penultimate',
                  deeper_arch=False,
+                 batchnorm=True,
                  **kwargs):
         super(smallEncoder, self).__init__()
         # s0 = self.s0 = img_size // 32
@@ -177,8 +178,11 @@ class smallEncoder(nn.Module):
         self.label_size = label_size
         self.modified = deeper_arch
 
-        bn = blocks.BatchNorm2d
-        # bn = nn.InstanceNorm2d
+        if batchnorm:
+            bn = blocks.BatchNorm2d
+        else:
+            bn = nn.InstanceNorm2d
+        print("Normalization in smallEncoder : ", bn)
 
         self.conv_img = nn.Conv2d(3, 1 * nf, 3, padding=1)
 
@@ -271,6 +275,7 @@ class Encoder(nn.Module):
             bn = blocks.BatchNorm2d
         else:
             bn = nn.InstanceNorm2d
+        print("Normalization in Encoder : ", bn)
 
         self.conv_img = nn.Conv2d(3, 1 * nf, 3, padding=1)
 
@@ -379,9 +384,11 @@ class LabelGenerator(nn.Module):
             bn = blocks.BatchNorm2d
         else:
             bn = nn.InstanceNorm2d
-        print("INIT LABEL GENERATOR")
+        print("Normalization in label generator : ", bn)
+
         self.modified = deeper_arch
         if not self.modified:
+            print("small label generator architecture")
             s0 = self.s0 = label_size // 4
             self.fc = nn.Linear(z_dim, 8 * nf * s0 * s0,bn)
 
@@ -404,27 +411,6 @@ class LabelGenerator(nn.Module):
             self.resnet_2_1 = ResnetBlock(4 * nf, 2 * nf, bn)
 
             self.resnet_3_0 = ResnetBlock(2 * nf, 1 * nf, bn)
-
-            # self.fc = nn.Linear(z_dim, 16 * nf * s0 * s0)
-            # self.resnet_0_0 = ResnetBlock(16 * nf, 16 * nf, bn )
-            # self.resnet_0_1 = ResnetBlock(16 * nf, 16 * nf, bn)
-            #
-            # self.resnet_0_2 = ResnetBlock(16 * nf, 16 * nf, bn)
-            # self.resnet_0_3 = ResnetBlock(16 * nf, 16 * nf, bn)
-            #
-            # self.resnet_1_0 = ResnetBlock(16 * nf, 8 * nf, bn)
-            # self.resnet_1_1 = ResnetBlock(8 * nf, 8 * nf, bn )
-            #
-            # self.resnet_2_0 = ResnetBlock(8 * nf, 4 * nf, bn )
-            # self.resnet_2_1 = ResnetBlock(4 * nf, 4 * nf, bn )
-            #
-            # self.resnet_3_0 = ResnetBlock(4 * nf, 2* nf, bn )
-            # self.resnet_3_1 = ResnetBlock(2 * nf, 2 * nf, bn )
-            #
-            # self.resnet_4_0 = ResnetBlock(2 * nf, 1 * nf, bn)
-            # self.resnet_4_1 = ResnetBlock(1 * nf, 1 * nf, bn)
-
-
 
         self.conv_img = nn.Sequential(nn.Conv2d(nf, self.local_nlabels, 3, padding = 1), nn.LogSoftmax(dim=1))
 
@@ -469,25 +455,6 @@ class LabelGenerator(nn.Module):
             out = self.resnet_2_1(out)
             out = F.interpolate(out, scale_factor=2)
             out = actvn(self.resnet_3_0(out))
-
-        #     out = out.view(z.size(0), 16 * self.nf, self.s0, self.s0)
-        #     out = self.resnet_0_0(out)
-        #     out = self.resnet_0_1(out)
-        #     out = F.interpolate(out, scale_factor=2)
-        #     out = self.resnet_0_2(out)
-        #     out = self.resnet_0_3(out)
-        #
-        #     out = self.resnet_1_0(out)
-        #     out = self.resnet_1_1(out)
-        #     out = F.interpolate(out, scale_factor=2)
-        #     out = self.resnet_2_0(out)
-        #     out = self.resnet_2_1(out)
-        #     out = F.interpolate(out, scale_factor=2)
-        #     out = self.resnet_3_0(out)
-        #     out = self.resnet_3_1(out)
-        #
-        #     out = self.resnet_4_0(out)
-        #     out = actvn(self.resnet_4_1(out))
         logits = self.conv_img(out)
         label_map, y_unorm = self.gumble_softmax(logits)
         # print("size of label map :", label_map.size())
@@ -504,7 +471,7 @@ class BiGANDiscriminator(nn.Module):
                  **kwargs):
         super().__init__()
         s0 = self.s0 = label_size
-        print("value of s0 in BiGAN DISC : ", s0)
+        print("value of s0 (label size) in BiGAN DISC : ", s0)
         nf = self.nf = nfilter
         self.nlabels = nlabels
         self.local_nlabels = local_nlabels
@@ -548,7 +515,9 @@ class BiGANDiscriminator(nn.Module):
             self.conv3z = nn.Sequential(nn.Conv2d(ndf * 4, ndf * 8, 1, 1, padding=0, bias=False),
                                         nn.LeakyReLU(0.2, inplace=True))
         elif self.noSegPath ==1:
-            self.conv1z = nn.Conv2d(self.local_nlabels, ndf * 8, 1, 1, padding=0, bias=False)
+            self.conv1z = nn.Sequential(nn.Conv2d(self.local_nlabels, ndf * 4, 3, 1, padding=1, bias=False),
+                                        nn.LeakyReLU(0.2, inplace=True),
+                                        nn.Conv2d(ndf * 4, ndf * 8, 1, 1, padding=0, bias=False))
         elif self.noSegPath == 2:
             self.conv1z = nn.Sequential(nn.Conv2d(self.local_nlabels, ndf*2, 1, 1, padding=0, bias=False),
                 nn.Conv2d(ndf*2, ndf * 4, 3, 1, padding=1),
@@ -573,19 +542,33 @@ class BiGANDiscriminator(nn.Module):
         else:
             if self.noSegPath ==1:
                 input_nc_seg = ndf*8
-            elif self.noSegPath ==2:
+
+                self.conv1xz = nn.Sequential(nn.Conv2d(ndf * 8 + input_nc_seg, ndf * 16, 3, 1,1),
+                                             nn.BatchNorm2d(ndf * 16),
+                                             nn.LeakyReLU(0.2, inplace=True))
+                self.conv2xz = nn.Sequential(nn.Conv2d(ndf * 16, ndf * 16, 1, 3,1,1),
+                                             nn.BatchNorm2d(ndf * 16),
+                                             nn.LeakyReLU(0.2, inplace=True))
+                # self.conv2xzbis1 = nn.Sequential(nn.Conv2d(ndf * 16, ndf * 16, 3, 1,1),
+                #                              nn.LeakyReLU(0.2, inplace=True))
+                self.conv2xzbis2 = nn.Sequential(nn.Conv2d(ndf * 16, ndf * 8, 3,1,1),
+                                                 nn.LeakyReLU(0.2, inplace=True))
+                self.conv3xz = nn.Sequential(nn.Conv2d(ndf * 8, 1, 1, stride=1, bias=False),
+                                             nn.LeakyReLU(0.2, inplace=True))
+                self.fc_out_joint = blocks.LinearUnconditionalLogits(s0 * s0)
+
+            elif self.noSegPath in [2,3]:
                 input_nc_seg = ndf*8
-            elif self.noSegPath ==3:
-                input_nc_seg = ndf*8
-            self.conv1xz = nn.Sequential(nn.Conv2d(ndf * 8 + input_nc_seg, ndf * 16, 1, stride=1, bias=False),
-                                     nn.LeakyReLU(0.2, inplace=True))
-            self.conv2xz = nn.Sequential(nn.Conv2d(ndf * 16, ndf * 16, 1, stride=1, bias=False), nn.LeakyReLU(0.2, inplace=True))
-            # self.conv2xzbis1 = nn.Sequential(nn.Conv2d(ndf * 16, ndf * 16, 3, 1,1),
-            #                              nn.LeakyReLU(0.2, inplace=True))
-            self.conv2xzbis2 = nn.Sequential(nn.Conv2d(ndf * 16, ndf * 8, 1, stride=1, bias=False),
+
+                self.conv1xz = nn.Sequential(nn.Conv2d(ndf * 8 + input_nc_seg, ndf * 16, 1, stride=1, bias=False),
                                          nn.LeakyReLU(0.2, inplace=True))
-            self.conv3xz = nn.Sequential(nn.Conv2d(ndf * 8, 1, 1, stride=1, bias=False), nn.LeakyReLU(0.2, inplace=True))
-            self.fc_out_joint = blocks.LinearUnconditionalLogits(s0*s0)
+                self.conv2xz = nn.Sequential(nn.Conv2d(ndf * 16, ndf * 16, 1, stride=1, bias=False), nn.LeakyReLU(0.2, inplace=True))
+                # self.conv2xzbis1 = nn.Sequential(nn.Conv2d(ndf * 16, ndf * 16, 3, 1,1),
+                #                              nn.LeakyReLU(0.2, inplace=True))
+                self.conv2xzbis2 = nn.Sequential(nn.Conv2d(ndf * 16, ndf * 8, 1, stride=1, bias=False),
+                                             nn.LeakyReLU(0.2, inplace=True))
+                self.conv3xz = nn.Sequential(nn.Conv2d(ndf * 8, 1, 1, stride=1, bias=False), nn.LeakyReLU(0.2, inplace=True))
+                self.fc_out_joint = blocks.LinearUnconditionalLogits(s0*s0)
 
 
     def inf_x(self,img):
@@ -628,116 +611,110 @@ class BiGANDiscriminator(nn.Module):
 
         return forQdisc, xseg
 
-# class BiGANDiscriminator(nn.Module):
-#     def __init__(self,
-#                  nlabels,
-#                  local_nlabels=None,
-#                  features='penultimate',
-#                  pack_size=1,
-#                  qhead_withImg=False,
-#                  img_path=False,
-#                  nc=3,
-#                  ndf=64,
-#                  img_size=0,
-#                  label_size=0,
-#                  **kwargs):
-#         super(BiGANDiscriminator, self).__init__()
-#         # print("USING BiGAN Discriminator", "qhead disc only with img network :", qhead_withImg)
-#         self.ndf = ndf
-#         self.nlabels = nlabels
-#         self.local_nlabels = local_nlabels
-#
-#         self.qhead_withImg = qhead_withImg
-#         self.img_path = img_path
-#
-#
-#         # self.final_res = img_size // (2 ** 3)  # if conv5 and conv6 are added
-#
-#         #inference over img
-#         self.conv1 = nn.Sequential(nn.Conv2d(3 * pack_size, ndf, 3, 1, 1),
-#                                    nn.BatchNorm2d(ndf),
-#                                    nn.LeakyReLU(0.2, inplace=True))
-#
-#         self.conv2 = nn.Sequential(nn.Conv2d(ndf, ndf, 4, 2, 1),
-#                                    nn.BatchNorm2d(ndf),
-#                                    nn.LeakyReLU(0.2, inplace=True))
-#
-#         self.conv3 = nn.Sequential(nn.Conv2d(ndf, ndf * 2, 3, 1, 1),
-#                                    nn.BatchNorm2d(ndf * 2),
-#                                    nn.LeakyReLU(0.2, inplace=True))
-#
-#         self.conv4 = nn.Sequential(nn.Conv2d(ndf * 2, ndf * 2, 4, 2, 1),
-#                                    nn.BatchNorm2d(ndf * 2),
-#                                    nn.LeakyReLU(0.2, inplace=True))
-#
-#         self.conv5 = nn.Sequential(nn.Conv2d(ndf * 2, ndf * 4, 4, 2, 1),
-#                                    nn.BatchNorm2d(ndf * 4),
-#                                    nn.LeakyReLU(0.2, inplace=True))
-#
-#
-#         if self.img_path:
-#             self.conv7 = nn.Sequential(nn.Conv2d(ndf * 8, ndf * 8, 4, 2, 1),
-#                                        nn.BatchNorm2d(ndf * 8),
-#                                        nn.LeakyReLU(0.2, inplace=True))
-#             self.fc_out_img = blocks.LinearUnconditionalLogits(ndf * 8*4*4) #nn.Sequential(nn.Conv2d(ndf * 8, 1, 1, stride=1, bias=False), nn.LeakyReLU(0.2, inplace=True))
-#
-#
-#         #inference over seg
-#         self.conv1z =nn.Sequential(nn.Conv2d(self.local_nlabels, ndf * 4, 1, 1, padding = 0, bias = False), nn.LeakyReLU(0.2, inplace=True))
-#         self.conv2z = nn.Sequential(nn.Conv2d(ndf * 4, ndf * 4, 1, 1, padding=0, bias=False), nn.LeakyReLU(0.2, inplace=True))
-#
-#         # Joint inference
-#         self.conv1xz = nn.Sequential(nn.Conv2d(ndf * 8, ndf * 8, 1, stride=1, bias=False), nn.LeakyReLU(0.2, inplace=True))
-#         self.conv2xz = nn.Sequential(nn.Conv2d(ndf * 8, ndf * 8, 1, stride=1, bias=False), nn.LeakyReLU(0.2, inplace=True))
-#         self.conv3xz = nn.Sequential(nn.Conv2d(ndf * 8, 1, 1, stride=1, bias=False), nn.LeakyReLU(0.2, inplace=True))
-#         #comment fc_out_joint to ouput a map of 8x8 to compute bin crossentropy on that :
-#         self.fc_out_joint = blocks.LinearUnconditionalLogits(8*8)
-#         # self.conv4xz = nn.Sequential(nn.Conv2d(1, 1, 4, 2,1, bias=False), nn.LeakyReLU(0.2, inplace=True))
-#
-#     def inf_x(self, img):
-#         out = self.conv1(img)   #to try : with dropout as in initial bigan model
-#         out = self.conv2(out)
-#         out = self.conv3(out)
-#         out = self.conv4(out)
-#         out = self.conv5(out)
-#         return out
-#
-#     def inf_seg(self,seg):
-#         out = self.conv1z(seg)
-#         out = self.conv2z(out)
-#         return out
-#
-#     def inf_xseg(self,xseg):
-#         out = self.conv1xz(xseg)
-#         forQdisc = self.conv2xz(out)
-#         out = self.conv3xz(forQdisc)
-#         out = out.view(out.size(0), -1)
-#         out = self.fc_out_joint(out)
-#         # out = self.conv4xz(out)
-#         return forQdisc, out
-#
-#
-#     def forward(self, input, seg):
-#         inputbis = self.inf_x(input)
-#         seg = self.inf_seg(seg)
-#         # print("in disc : ", seg.size(), inputbis.size())
-#         xseg = torch.cat((inputbis, seg), dim = 1)
-#         forQdisc, xseg = self.inf_xseg(xseg)
-#
-#         if not self.qhead_withImg:
-#             forQdisc = forQdisc
-#         else:
-#             forQdisc = inputbis
-#
-#         if not self.img_path:
-#             return forQdisc, xseg
-#         else:
-#             input = self.conv6(inputbis)
-#             input = self.conv7(input)
-#             input = input.view(input.size(0),-1)
-#             input = self.fc_out_img(input)
-#             # print("img path", input.size(), xseg.size())
-#             return forQdisc, xseg, input
+
+class smallBiGANDiscriminator(nn.Module):
+    def __init__(self,
+                 nlabels,
+                 local_nlabels,
+                 img_size,
+                 label_size,
+                 nfilter=64,
+                 noSegPath=True,
+                 **kwargs):
+        super(smallBiGANDiscriminator, self).__init__()
+        s0 = self.s0 = label_size
+        print("value of s0 in BiGAN DISC : ", s0)
+        print("Training with small Discriminator")
+        nf = self.nf = nfilter
+        self.nlabels = nlabels
+        self.local_nlabels = local_nlabels
+        self.img_size = img_size
+        self.label_size = label_size
+        self.noSegPath = noSegPath
+        print("Not using Seg Path : ", noSegPath)
+
+        # bn = blocks.BatchNorm2d
+
+        # inference over x
+        ndf = nf
+        self.conv1 = nn.Sequential(nn.Conv2d(3, ndf, 3, 1, 1),
+                                   nn.BatchNorm2d(ndf),
+                                   nn.LeakyReLU(0.2, inplace=True))
+
+        self.conv2 = nn.Sequential(nn.Conv2d(ndf, ndf, 4, 2, 1),
+                                   nn.BatchNorm2d(ndf),
+                                   nn.LeakyReLU(0.2, inplace=True))
+
+        self.conv3 = nn.Sequential(nn.Conv2d(ndf, ndf * 2, 3, 1, 1),
+                                   nn.BatchNorm2d(ndf * 2),
+                                   nn.LeakyReLU(0.2, inplace=True))
+
+        self.conv4 = nn.Sequential(nn.Conv2d(ndf * 2, ndf * 2, 4, 2, 1),
+                                   nn.BatchNorm2d(ndf * 2),
+                                   nn.LeakyReLU(0.2, inplace=True))
+
+        self.conv5 = nn.Sequential(nn.Conv2d(ndf * 2, ndf * 4, 3, 1, 1),
+                                   nn.BatchNorm2d(ndf * 4),
+                                   nn.LeakyReLU(0.2, inplace=True))
+
+        # inference over seg
+        if not self.noSegPath:
+            self.conv1z = nn.Sequential(nn.Conv2d(self.local_nlabels, ndf * 2, 3, 1, padding=1, bias=False),
+                                    nn.LeakyReLU(0.2, inplace=True),
+                                    nn.Conv2d(ndf * 2, ndf * 4, 1, 1, padding=0, bias=False))
+
+        # joint inference
+        self.conv1xz = nn.Sequential(nn.Conv2d(ndf * 8, ndf * 8, 3, 1, 1),
+                                     nn.BatchNorm2d(ndf * 8),
+                                     nn.LeakyReLU(0.2, inplace=True))
+        self.conv2xz = nn.Sequential(nn.Conv2d(ndf * 8, ndf * 8, 4, 2, 1),
+                                     nn.BatchNorm2d(ndf * 8),
+                                     nn.LeakyReLU(0.2, inplace=True))
+        self.conv2xzbis = nn.Sequential(nn.Conv2d(ndf * 8, ndf * 4, 3, 1, 1),
+                                         nn.BatchNorm2d(ndf * 4),
+                                         nn.LeakyReLU(0.2, inplace=True))
+        self.conv3xz = nn.Sequential(nn.Conv2d(ndf * 4, 1, 1, stride=1, bias=False),
+                                     nn.LeakyReLU(0.2, inplace=True))
+        self.fc_out_joint = blocks.LinearUnconditionalLogits(int(s0 * s0/4))
+
+
+
+    def inf_x(self, img):
+        out = self.conv1(img)  # to try : with dropout as in initial bigan model
+        out = self.conv2(out)
+        out = self.conv3(out)
+        out = self.conv4(out)
+        out = self.conv5(out)
+
+        return out
+
+    def inf_seg(self, seg):
+        out = self.conv1z(seg)
+        return out
+
+    def inf_xseg(self, xseg):
+        out = self.conv1xz(xseg)
+        out = self.conv2xz(out)
+
+        out = self.conv2xzbis(out)
+        out = self.conv3xz(out)
+        out = out.view(out.size(0), -1)
+        out = self.fc_out_joint(out)
+        return out
+
+    def forward(self, input, seg):
+        inputbis = self.inf_x(input)
+        seg = self.inf_seg(seg)
+        # print(torch.min(seg), torch.max(seg), seg.size(), torch.min(self.conv1z.weight.data), torch.max(self.conv1z.weight.data), "seg min max values")
+        # print(seg.size(), inputbis.size())
+        xseg = torch.cat((inputbis, seg), dim=1)
+        xseg = self.inf_xseg(xseg)
+
+        forQdisc = inputbis
+
+        return forQdisc, xseg
+
+
 class BiGANQHeadDiscriminator(nn.Module):
     def __init__(self,
                  nlabels,
@@ -758,26 +735,30 @@ class BiGANQHeadDiscriminator(nn.Module):
         #
         # self.bn1 = nn.BatchNorm2d(512)
         if qhead_variant:
-            self.conv2_lab = nn.Conv2d(512, 256, 3, 1, 1)
-            self.bn2_lab = nn.BatchNorm2d(256)
-            self.conv3_lab = nn.Conv2d(256, 128, 4, 2, 1)
-            self.bn3_lab = nn.BatchNorm2d(128)
-            self.conv4_lab = nn.Conv2d(128, 128, size // 2, bias=False)
-            self.bn4_lab = nn.BatchNorm2d(128)
+            input_nc=256
+        else:
+            input_nc = 512
 
-            self.conv_mu_lab = nn.Conv2d(128, z_dim_lab, 1)
-            self.conv_var_lab = nn.Conv2d(128, z_dim_lab, 1)
+        self.conv2_lab = nn.Conv2d(input_nc, 256, 3, 1, 1)
+        self.bn2_lab = nn.BatchNorm2d(256)
+        self.conv3_lab = nn.Conv2d(256, 128, 4, 2, 1)
+        self.bn3_lab = nn.BatchNorm2d(128)
+        self.conv4_lab = nn.Conv2d(128, 128, size // 2, bias=False)
+        self.bn4_lab = nn.BatchNorm2d(128)
 
-            self.conv2_img = nn.Conv2d(512, 256, 3, 1, 1)
-            self.bn2_img = nn.BatchNorm2d(256)
-            self.conv3_img = nn.Conv2d(256, 128, 4, 2, 1)
-            self.bn3_img = nn.BatchNorm2d(128)
-            self.conv4_img = nn.Conv2d(128, 128, size // 2, bias=False)
-            self.bn4_img = nn.BatchNorm2d(128)
+        self.conv_mu_lab = nn.Conv2d(128, z_dim_lab, 1)
+        self.conv_var_lab = nn.Conv2d(128, z_dim_lab, 1)
 
-            self.conv_mu_img = nn.Conv2d(128, z_dim_img, 1)
-            self.conv_var_img = nn.Conv2d(128, z_dim_img, 1)
-            print("2nd Qhead discriminator with label map and img z to recover", "z_dim_img : ", z_dim_img, "z_dim_lab", z_dim_lab)
+        self.conv2_img = nn.Conv2d(input_nc, 256, 3, 1, 1)
+        self.bn2_img = nn.BatchNorm2d(256)
+        self.conv3_img = nn.Conv2d(256, 128, 4, 2, 1)
+        self.bn3_img = nn.BatchNorm2d(128)
+        self.conv4_img = nn.Conv2d(128, 128, size // 2, bias=False)
+        self.bn4_img = nn.BatchNorm2d(128)
+
+        self.conv_mu_img = nn.Conv2d(128, z_dim_img, 1)
+        self.conv_var_img = nn.Conv2d(128, z_dim_img, 1)
+        print("Qhead discriminator with label map and img z to recover", "z_dim_img : ", z_dim_img, "z_dim_lab", z_dim_lab)
 
             # self.conv2 = nn.Conv2d(512, 256, 3, 1, 1)
             # self.bn2 = nn.BatchNorm2d(256)
@@ -791,21 +772,19 @@ class BiGANQHeadDiscriminator(nn.Module):
 
     def forward(self,x):
         # x = F.leaky_relu(self.bn1(self.conv1(x)), 0.1, inplace=True)
+        x_lab = F.leaky_relu(self.bn2_lab(self.conv2_lab(x)), 0.1, inplace=True)
+        x_lab = F.leaky_relu(self.bn3_lab(self.conv3_lab(x_lab)), 0.1, inplace=True)
+        x_lab = F.leaky_relu(self.bn4_lab(self.conv4_lab(x_lab)), 0.1, inplace=True)
+        mu_lab = self.conv_mu_lab(x_lab).squeeze()
+        var_lab = torch.exp(self.conv_var_lab(x_lab).squeeze())
 
-        if self.qhead_variant:
-            x_lab = F.leaky_relu(self.bn2_lab(self.conv2_lab(x)), 0.1, inplace=True)
-            x_lab = F.leaky_relu(self.bn3_lab(self.conv3_lab(x_lab)), 0.1, inplace=True)
-            x_lab = F.leaky_relu(self.bn4_lab(self.conv4_lab(x_lab)), 0.1, inplace=True)
-            mu_lab = self.conv_mu_lab(x_lab).squeeze()
-            var_lab = torch.exp(self.conv_var_lab(x_lab).squeeze())
+        x_img = F.leaky_relu(self.bn2_img(self.conv2_img(x)), 0.1, inplace=True)
+        x_img = F.leaky_relu(self.bn3_img(self.conv3_img(x_img)), 0.1, inplace=True)
+        x_img = F.leaky_relu(self.bn4_img(self.conv4_img(x_img)), 0.1, inplace=True)
+        mu_img = self.conv_mu_img(x_img).squeeze()
+        var_img = torch.exp(self.conv_var_img(x_img).squeeze())
 
-            x_img = F.leaky_relu(self.bn2_img(self.conv2_img(x)), 0.1, inplace=True)
-            x_img = F.leaky_relu(self.bn3_img(self.conv3_img(x_img)), 0.1, inplace=True)
-            x_img = F.leaky_relu(self.bn4_img(self.conv4_img(x_img)), 0.1, inplace=True)
-            mu_img = self.conv_mu_img(x_img).squeeze()
-            var_img = torch.exp(self.conv_var_img(x_img).squeeze())
-
-            return mu_lab, var_lab, mu_img, var_img
+        return mu_lab, var_lab, mu_img, var_img
 
 def actvn(x):
     out = F.leaky_relu(x, 2e-1)
