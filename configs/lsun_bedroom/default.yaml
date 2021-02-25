@@ -1,0 +1,44 @@
+data:
+  type: lsun_bedroom
+  train_dir: data/lsun_bedroom/train
+  test_dir: data/lsun_bedroom/val
+  img_size: 64
+  nlabels: 1000
+decoder:
+  name: resnet_lsun
+  nlabels: 1
+  conditioning: unconditional
+  kwargs:
+    placeholder: None
+encoder:
+  name: resnet_lsun
+  nlabels: 1
+  conditioning: unconditional
+  kwargs:
+    placeholder: None
+label_generator:
+  label_size: 16
+  name: resnet_lsun
+  zdim: 50
+  kwargs:
+    placeholder: None
+discriminator:
+  name: resnet_lsun
+qhead_discriminator:
+  name: resnet_lsun
+z_dist:
+  type: uniform
+  dim: 256
+training:
+  gan_type: standard
+  reg_type: none
+  reg_param: 0.
+  take_model_average: false
+  model_average_beta: 0.999
+  sample_nlabels: 500
+  log_every: 100
+  inception_every: 10000
+  fid_every: 10000
+  backup_every: 5000
+  batch_size: 128
+  sample_every: 500
