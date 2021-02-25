@@ -6,6 +6,7 @@ z_dist:
   type: uniform
   dim: 5
 encoder:
+  name: resnet_lsun_small
   nlabels: 1
   n_locallabels: 5
   kwargs:
@@ -16,7 +17,7 @@ discriminator:
   nlabels: 1
   n_locallabels: 5
   kwargs:
-    noSegPath: 0
+    noSegPath: 3
 label_generator:
   zdim: 30
   label_size: 16
@@ -24,11 +25,11 @@ label_generator:
   n_locallabels: 5
   conditioning: unconditional
   kwargs:
-    deeper_arch: True
+    deeper_arch: False
     batchnorm: False
-inherit_from: configs/lsun/default.yaml
+inherit_from: configs/lsun_bedroom/default.yaml
 training:
-  out_dir: output/lsun/selfcondgan_labelRes16_K_5_ZImg5_ZLab30_var0_ema_InstanceNorm
+  out_dir: output/lsun_bedroom/selfcondgan_labelRes16_K_5_ZImg5_ZLab30_var3_ema_InstanceNorm_smallLGEnc
   reg_param: 0.1
   con_loss: True
   lambda_LabConLoss: 0.1
