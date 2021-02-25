@@ -78,7 +78,11 @@ def get_dataset(name,
                                    classes=['church_outdoor_train'],
                                    transform=transform)
         nlabels = 1
-
+    elif name == 'lsun_bedroom':
+        dataset = datasets.LSUN(root='data/lsun_bedroom/train',
+                                   classes=['bedroom'],
+                                   transform=transform)
+        nlabels = 1
     elif name == 'cifar10':
         dataset = datasets.CIFAR10(root=data_dir,
                                    train=True,
