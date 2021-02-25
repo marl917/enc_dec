@@ -80,7 +80,7 @@ def get_dataset(name,
         nlabels = 1
     elif name == 'lsun_bedroom':
         dataset = datasets.LSUN(root='data/lsun_bedroom/train',
-                                   classes=['bedroom'],
+                                   classes=['bedroom_train'],
                                    transform=transform)
         nlabels = 1
     elif name == 'cifar10':
