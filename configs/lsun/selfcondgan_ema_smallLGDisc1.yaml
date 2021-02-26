@@ -17,7 +17,7 @@ discriminator:
   n_locallabels: 5
   kwargs:
     noSegPath: 0
-    case: 0
+    case: 1
 label_generator:
   zdim: 30
   label_size: 16
@@ -28,7 +28,7 @@ label_generator:
     deeper_arch: False
 inherit_from: configs/lsun/default.yaml
 training:
-  out_dir: output/lsun/selfcondgan_labelRes16_K_5_ZImg5_ZLab30_ema_smallLG_smallDisc0bis
+  out_dir: output/lsun/selfcondgan_labelRes16_K_5_ZImg5_ZLab30_ema_smallLG_smallDisc1
   reg_param: 0.1
   con_loss: True
   lambda_LabConLoss: 0.1

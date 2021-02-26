@@ -468,6 +468,7 @@ class BiGANDiscriminator(nn.Module):
                  label_size,
                  nfilter=64,
                  noSegPath=True,
+                 case=0,
                  **kwargs):
         super().__init__()
         s0 = self.s0 = label_size
@@ -619,7 +620,7 @@ class smallBiGANDiscriminator(nn.Module):
                  img_size,
                  label_size,
                  nfilter=64,
-                 noSegPath=True,
+                 case=0,
                  **kwargs):
         super(smallBiGANDiscriminator, self).__init__()
         s0 = self.s0 = label_size
@@ -657,25 +658,45 @@ class smallBiGANDiscriminator(nn.Module):
                                    nn.BatchNorm2d(ndf * 4),
                                    nn.LeakyReLU(0.2, inplace=True))
 
+
+
         # inference over seg
-        if not self.noSegPath:
-            self.conv1z = nn.Sequential(nn.Conv2d(self.local_nlabels, ndf * 2, 3, 1, padding=1, bias=False),
+        if case ==0:
+            self.conv1z = nn.Sequential(nn.Conv2d(self.local_nlabels, ndf * 4, 3, 1, padding=1, bias=False),
                                     nn.LeakyReLU(0.2, inplace=True),
-                                    nn.Conv2d(ndf * 2, ndf * 4, 1, 1, padding=0, bias=False))
+                                    nn.Conv2d(ndf * 4, ndf * 8, 1, 1, padding=0, bias=False))
+        else:
+            self.conv1z = nn.Sequential(nn.Conv2d(self.local_nlabels, ndf * 2, 3, 1, padding=1, bias=False),
+                                        nn.LeakyReLU(0.2, inplace=True),
+                                        nn.Conv2d(ndf * 2, ndf * 4, 1, 1, padding=0, bias=False))
 
         # joint inference
-        self.conv1xz = nn.Sequential(nn.Conv2d(ndf * 8, ndf * 8, 3, 1, 1),
-                                     nn.BatchNorm2d(ndf * 8),
-                                     nn.LeakyReLU(0.2, inplace=True))
-        self.conv2xz = nn.Sequential(nn.Conv2d(ndf * 8, ndf * 8, 4, 2, 1),
-                                     nn.BatchNorm2d(ndf * 8),
-                                     nn.LeakyReLU(0.2, inplace=True))
-        self.conv2xzbis = nn.Sequential(nn.Conv2d(ndf * 8, ndf * 4, 3, 1, 1),
-                                         nn.BatchNorm2d(ndf * 4),
+        if case==0:
+            self.conv6 = nn.Sequential(nn.Conv2d(ndf * 4, ndf * 8, 3, 1, 1),
+                                       nn.BatchNorm2d(ndf * 8),
+                                       nn.LeakyReLU(0.2, inplace=True))
+            self.conv1xz = nn.Sequential(nn.Conv2d(ndf * 16, ndf * 16, 3, 1, 1),
+                                         nn.BatchNorm2d(ndf * 16),
                                          nn.LeakyReLU(0.2, inplace=True))
-        self.conv3xz = nn.Sequential(nn.Conv2d(ndf * 4, 1, 1, stride=1, bias=False),
-                                     nn.LeakyReLU(0.2, inplace=True))
-        self.fc_out_joint = blocks.LinearUnconditionalLogits(int(s0 * s0/4))
+            self.conv2xz = nn.Sequential(nn.Conv2d(ndf * 16, ndf * 16, 4, 2, 1),
+                                         nn.BatchNorm2d(ndf * 16),
+                                         nn.LeakyReLU(0.2, inplace=True))
+            self.conv2xzbis = nn.Sequential(nn.Conv2d(ndf * 16, ndf * 8, 3, 1, 1),
+                                             nn.BatchNorm2d(ndf * 8),
+                                             nn.LeakyReLU(0.2, inplace=True))
+            self.conv3xz = nn.Sequential(nn.Conv2d(ndf * 8, 1, 1, stride=1, bias=False),
+                                         nn.LeakyReLU(0.2, inplace=True))
+            self.fc_out_joint = blocks.LinearUnconditionalLogits(int(s0 * s0/4))
+        else:
+            self.conv1xz = nn.Sequential(nn.Conv2d(ndf * 8 , ndf * 8, 1, stride=1, bias=False),
+                                         nn.LeakyReLU(0.2, inplace=True))
+            self.conv2xz = nn.Sequential(nn.Conv2d(ndf * 8, ndf * 8, 1, stride=1, bias=False),
+                                         nn.LeakyReLU(0.2, inplace=True))
+            self.conv2xzbis2 = nn.Sequential(nn.Conv2d(ndf * 8, ndf * 4, 1, stride=1, bias=False),
+                                             nn.LeakyReLU(0.2, inplace=True))
+            self.conv3xz = nn.Sequential(nn.Conv2d(ndf * 4, 1, 1, stride=1, bias=False),
+                                         nn.LeakyReLU(0.2, inplace=True))
+            self.fc_out_joint = blocks.LinearUnconditionalLogits(s0 * s0)
 
 
 
@@ -685,6 +706,8 @@ class smallBiGANDiscriminator(nn.Module):
         out = self.conv3(out)
         out = self.conv4(out)
         out = self.conv5(out)
+        if case==0:
+            out = self.conv6(out)
 
         return out
 
