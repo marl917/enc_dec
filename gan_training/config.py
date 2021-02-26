@@ -104,7 +104,7 @@ def build_models(config):
                   nlabels=config['discriminator']['nlabels'],
                   local_nlabels=config['discriminator']['n_locallabels'],
                   size=config['label_generator']['label_size'],
-                  qhead_variant = config['discriminator']['name'] == 'resnet_lsun_small',
+                  qhead_variant = config['discriminator']['name'] == 'resnet_lsun_small' and config['discriminator']['kwargs']['case'] == 1,
                   **config['discriminator']['kwargs'])
 
     return decoder, encoder, discriminator, label_generator, qhead_discriminator
