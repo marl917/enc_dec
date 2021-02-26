@@ -1,0 +1,37 @@
+decoder:
+  deterministicOnSeg: False
+  nlabels: 1
+  n_locallabels: 5
+z_dist:
+  type: uniform
+  dim: 5
+encoder:
+  nlabels: 1
+  n_locallabels: 5
+  kwargs:
+    deeper_arch: False
+    classifier_mod: False
+discriminator:
+  name: resnet_lsun_small
+  nlabels: 1
+  n_locallabels: 5
+  kwargs:
+    noSegPath: 0
+    case: 2
+label_generator:
+  zdim: 30
+  label_size: 16
+  nlabels: 1
+  n_locallabels: 5
+  conditioning: unconditional
+  kwargs:
+    deeper_arch: False
+inherit_from: configs/lsun/default.yaml
+training:
+  out_dir: output/lsun/selfcondgan_labelRes16_K_5_ZImg5_ZLab30_ema_smallLG_smallDisc2
+  reg_param: 0.1
+  con_loss: True
+  lambda_LabConLoss: 0.1
+  entropy_loss: False
+  take_model_average: True
+
