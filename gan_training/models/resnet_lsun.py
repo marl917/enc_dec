@@ -738,7 +738,7 @@ class smallBiGANDiscriminator(nn.Module):
         out = self.conv3(out)
         out = self.conv4(out)
         out = self.conv5(out)
-        if self.case==0:
+        if self.case in[0,3]:
             out = self.conv6(out)
             #out = self.conv7(out)
 
