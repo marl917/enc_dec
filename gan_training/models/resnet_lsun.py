@@ -9,74 +9,6 @@ from gan_training.models import blocks
 from gan_training.models.blocks import ResnetBlock
 from torch.nn.utils.spectral_norm import spectral_norm
 
-class smallDecoder(nn.Module):
-    def __init__(self,
-                 nlabels,
-                 local_nlabels=0,
-                 z_dim=128,
-                 nc=3,
-                 ngf=64,
-                 embed_dim=256,
-                 deterministicOnSeg=False,
-                 size=0,
-                 label_size = 0,
-                 **kwargs):
-        super(smallDecoder, self).__init__()
-
-        self.sw = size // (2 ** 4)
-        self.sh = self.sw  # assumption of square images
-
-        self.deterministicOnSeg = deterministicOnSeg
-        print("Decoder only depends on Segmentation : ", self.deterministicOnSeg)
-
-        self.get_latent = blocks.Identity()
-        if self.deterministicOnSeg:
-            nc_noise=1
-            self.fc_noise = nn.Linear(z_dim, label_size * label_size * nc_noise)
-            self.fc_img = nn.Conv2d(local_nlabels + nc_noise, ngf * 8, 3, padding=1)
-            self.label_size = label_size
-            local_nlabels += nc_noise  # to remove if no noise included in seg
-        else:
-            self.fc = nn.Linear(z_dim, self.sh * self.sw * ngf * 8)
-
-        self.up = nn.Upsample(scale_factor=2)
-
-        self.up_0 = blocks.SPADEResnetBlock(8 * ngf, 8 * ngf, local_nlabels, self.deterministicOnSeg)
-        self.up_1 = blocks.SPADEResnetBlock(8 * ngf, 4 * ngf, local_nlabels,self.deterministicOnSeg)
-        self.up_2 = blocks.SPADEResnetBlock(4 * ngf, 2 * ngf, local_nlabels,self.deterministicOnSeg)
-        self.up_3 = blocks.SPADEResnetBlock(2 * ngf, 1 * ngf, local_nlabels,self.deterministicOnSeg)
-        self.conv_img = nn.Conv2d(ngf, 3, 3, padding=1)
-
-    def forward(self, seg, input=None):  #input=z
-        #y = y.clamp(None, self.global_nlabels - 1)
-
-        if self.deterministicOnSeg:
-            out = self.get_latent(input)
-
-            out = self.fc_noise(out)
-            out = out.view(out.size(0), -1, self.label_size, self.label_size)
-            seg = torch.cat((seg, out), dim=1)
-            out = F.interpolate(seg, size=(self.sh, self.sw))
-            out = self.fc_img(out)
-
-        else:
-            out = self.get_latent(input)
-            # print("out size in decoder : ", out.size())
-            out = self.fc(out)
-            out = out.view(out.size(0), -1, self.sh, self.sw)
-
-        x = self.up_0(out, seg)
-        x = self.up(x)
-        x = self.up_1(x, seg)
-        x = self.up(x)
-        x = self.up_2(x, seg)
-        x = self.up(x)
-        x = self.up_3(x, seg)
-        x = self.up(x)
-        x = self.conv_img(F.leaky_relu(x, 2e-1))
-        x = torch.tanh(x)
-        return x
-
 class Decoder(nn.Module):
     def __init__(self,
                  nlabels,
@@ -157,7 +89,7 @@ class Decoder(nn.Module):
         x = torch.tanh(x)
         return x
 
-class smallEncoder(nn.Module):
+class MunitEncoder(nn.Module):
     def __init__(self,
                  nlabels,
                  local_nlabels,
@@ -168,7 +100,7 @@ class smallEncoder(nn.Module):
                  deeper_arch=False,
                  batchnorm=True,
                  **kwargs):
-        super(smallEncoder, self).__init__()
+        super(MunitEncoder, self).__init__()
         # s0 = self.s0 = img_size // 32
         print("img size in encoder :", img_size)
         nf = self.nf = nfilter
@@ -176,35 +108,36 @@ class smallEncoder(nn.Module):
         self.local_nlabels = local_nlabels
         self.img_size =img_size
         self.label_size = label_size
-        self.modified = deeper_arch
+
+        self.logSoftmax = nn.LogSoftmax(dim=1)
+        self.FloatTensor = torch.cuda.FloatTensor
 
         if batchnorm:
             bn = blocks.BatchNorm2d
         else:
             bn = nn.InstanceNorm2d
-        print("Normalization in smallEncoder : ", bn)
+        print("Normalization in Encoder : ", bn)
 
-        self.conv_img = nn.Conv2d(3, 1 * nf, 3, padding=1)
+        n_downsample = 2
+        n_res = 4
+        self.model = []
+        nf=8
+        self.model += [blocks.Conv2dBlock(3,nf, 7, 1, 3, norm='in', activation='lrelu', pad_type='reflect')]
+        # downsampling blocks
+        for i in range(n_downsample):
+            self.model += [blocks.Conv2dBlock(nf, 2 * nf, 4, 2, 1,norm='in', activation='lrelu', pad_type='reflect')]
+            nf *= 2
+        # residual blocks
+        self.model += [blocks.ResBlocks(n_res, nf, norm='in', activation='lrelu', pad_type='reflect')]
+        self.model = nn.Sequential(*self.model)
+        self.output_dim = nf
 
-        # self.resnet_0_0 = ResnetBlock(1 * nf, 1 * nf, bn)
-        self.resnet_0_1 = ResnetBlock(1 * nf, 2 * nf, bn)
+    def forward(self, x):
+        features = self.model(x)
+        logits = self.logSoftmax(features)
+        label_map, label_map_unorm = self.gumble_softmax(logits)
 
-        # self.resnet_1_0 = ResnetBlock(2 * nf, 2 * nf, bn)
-        self.resnet_1_1 = ResnetBlock(2 * nf, 4 * nf, bn)
-
-        # self.resnet_2_0 = ResnetBlock(4 * nf, 4 * nf, bn)
-        self.resnet_2_1 = ResnetBlock(4 * nf, 8 * nf, bn)
-
-        # self.resnet_3_0 = ResnetBlock(8 * nf, 8 * nf, bn)
-        # self.resnet_3_1 = ResnetBlock(8 * nf, 16 * nf, bn)
-        #
-        # self.resnet_4_0 = ResnetBlock(16 * nf, 16 * nf, bn)
-        # self.resnet_4_1 = ResnetBlock(16 * nf, 16 * nf, bn)
-
-        self.local_FeatureMapping = blocks.local_FeatureMapping(num_classes=self.local_nlabels, n_channels=8*nf)
-
-        self.logSoftmax = nn.LogSoftmax(dim=1)
-        self.FloatTensor = torch.cuda.FloatTensor
+        return label_map_unorm, label_map
 
     def sample_gumbel(self, shape, logits, eps=1e-20):
         U = logits.new(shape).uniform_(0, 1)  # = torch.rand(shape).cuda()
@@ -224,31 +157,6 @@ class smallEncoder(nn.Module):
         y_hard = input_label.scatter_(1, x.long().cuda(), 1.0)
         return (y_hard - y).detach() + y, y_unorm
 
-    def forward(self, x):
-        out = self.conv_img(x)
-
-        # out = self.resnet_0_0(out)
-        out = self.resnet_0_1(out)
-        out = F.avg_pool2d(out, 3, stride=2, padding=1)
-        # out = self.resnet_1_0(out)
-        out = self.resnet_1_1(out)
-
-        # out = self.resnet_2_0(out)
-        out = self.resnet_2_1(out)
-        out = F.avg_pool2d(out, 3, stride=2, padding=1)
-        # out = self.resnet_3_0(out)
-        # out = self.resnet_3_1(out)
-
-        # out = self.resnet_4_0(out)
-        # out = self.resnet_4_1(out)
-
-        out = actvn(out)
-        out = self.local_FeatureMapping(out)
-
-        logits = self.logSoftmax(out)
-        label_map, label_map_unorm = self.gumble_softmax(logits)
-
-        return label_map_unorm, label_map
 
 class Encoder(nn.Module):
     def __init__(self,
@@ -685,7 +593,17 @@ class smallBiGANDiscriminator(nn.Module):
                                         nn.LeakyReLU(0.2, inplace=True),
                                         nn.Conv2d(ndf * 8, ndf * 8, 1, 1, padding=0, bias=False)
                                         )
-
+        elif case == 5 :
+            self.conv1z = nn.Sequential(nn.Conv2d(self.local_nlabels, ndf * 2, 3, 1, padding=1, bias=False),
+                                        nn.BatchNorm2d(ndf * 2),
+                                        nn.LeakyReLU(0.2, inplace=True),
+                                        nn.Conv2d(ndf * 2, ndf * 4, 3, 1, padding=1, bias=False),
+                                        nn.BatchNorm2d(ndf * 4),
+                                        nn.LeakyReLU(0.2, inplace=True),
+                                        nn.Conv2d(ndf * 4, ndf * 8, 3, 1, padding=1, bias=False),
+                                        nn.LeakyReLU(0.2, inplace=True),
+                                        nn.Conv2d(ndf * 8, ndf * 8, 1, 1, padding=0, bias=False)
+                                        )
         # joint inference
         if case in [0,2]:
             self.conv6 = nn.Sequential(nn.Conv2d(ndf * 4, ndf * 8, 3, 1, 1),
@@ -731,7 +649,7 @@ class smallBiGANDiscriminator(nn.Module):
             self.conv3xz = nn.Sequential(nn.Conv2d(ndf * 16, 1, 1, stride=1, bias=False),
                                          nn.LeakyReLU(0.2, inplace=True))
             self.fc_out_joint = blocks.LinearUnconditionalLogits(s0 * s0)
-        elif case == 4:
+        elif case in [4,5]:
             self.conv6 = nn.Sequential(nn.Conv2d(ndf * 4, ndf * 4, 3, 1, 1),
                                        nn.BatchNorm2d(ndf * 4),
                                        nn.LeakyReLU(0.2, inplace=True))
@@ -753,9 +671,9 @@ class smallBiGANDiscriminator(nn.Module):
         out = self.conv3(out)
         out = self.conv4(out)
         out = self.conv5(out)
-        if self.case in[0,3,4]:
+        if self.case in[0,3,4,5]:
             out = self.conv6(out)
-            if self.case==4:
+            if self.case in [4,5]:
                 out = self.conv7(out)
 
         return out
@@ -767,7 +685,7 @@ class smallBiGANDiscriminator(nn.Module):
     def inf_xseg(self, xseg):
         out = self.conv1xz(xseg)
         out = self.conv2xz(out)
-        if not self.case in [3,4]:
+        if not self.case in [3,4,5]:
             out = self.conv2xzbis(out)
         out = self.conv3xz(out)
         out = out.view(out.size(0), -1)
