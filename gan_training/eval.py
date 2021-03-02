@@ -150,6 +150,34 @@ class Evaluator(object):
         print(self.device)
         os.system(f'CUDA_VISIBLE_DEVICES={0} python gan_training/metrics/fid.py {arguments}')
 
+    def create_samples_perturbSeg(self,z,z_lab,n_samples):
+        self.label_generator.eval()
+        self.decoder.eval()
+        with torch.no_grad():
+            _, label_map = self.label_generator(z_lab)
+        segs = [label_map]
+        x = torch.argmax(label_map, dim=1)
+        for _ in range(n_samples - 1):
+            label_map_p = x
+            for i in range(7):
+                for j in range(7):
+                    # i = np.random.randint(0,15)
+                    # j = np.random.randint(0, 15)
+                    label_map_p[0, i, j] = (label_map_p[0, i, j] + np.random.randint(1, 4)) % self.n_locallabels
+            label_map_p = torch.unsqueeze(label_map_p, dim=1)
+            bs, _, h, w = label_map_p.size()
+            input_label = torch.cuda.FloatTensor(bs, self.n_locallabels, h, w).zero_()
+            y_hard = input_label.scatter_(1, label_map_p.long().cuda(), 1.0)
+            segs.append(y_hard)
+        segs = torch.cat(segs, dim=0)
+
+        with torch.no_grad():
+            print(segs.size())
+            x_fake = self.decoder(seg=segs, input=z)
+
+        lab_up = F.interpolate(segs.float(), size=x_fake.size()[2:], mode='bilinear', align_corners=True)
+        color_lab_map = self.create_colormap(lab_up)
+        return x_fake, color_lab_map
 
     def create_samples_labelGen(self,z, z_lab, out_dir=None):
         self.decoder.eval()

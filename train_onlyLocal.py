@@ -300,34 +300,13 @@ def main():
         sys.exit()
 
     if args.perturb_seg:
-        n_locallabels = config['encoder']['n_locallabels']
         n_samples = 16
         z_test_same = zdist.sample((1,))
         z_test_same = torch.cat((z_test_same,) * n_samples, dim=0)
         z_lab_same = zdist_lab.sample((1,))
-        label_generator.eval()
-        decoder.eval()
-        with torch.no_grad():
-            _, label_map = label_generator_test(z_lab_same)
-        segs = [label_map]
-        x = torch.argmax(label_map, dim=1)
-        for _ in range(n_samples-1):
-            i = np.random.randint(0,15)
-            j = np.random.randint(0, 15)
-            print(i,j)
-            label_map_p = x
-            print(label_map_p[0,i,j])
-            label_map_p[0,i,j]= (label_map_p[0,i,j] + 1) % n_locallabels
-            label_map_p = torch.unsqueeze(label_map_p, dim=1)
-            bs, _, h, w = label_map_p.size()
-            input_label = torch.cuda.FloatTensor(bs, n_locallabels, h, w).zero_()
-            y_hard = input_label.scatter_(1, label_map_p.long().cuda(), 1.0)
-            segs.append(y_hard)
-        segs = torch.cat(segs, dim = 0)
-        with torch.no_grad():
-            print(segs.size(), z_test_same.size())
-            x_fake = decoder_test(seg=segs, input=z_test_same)
-        logger.add_imgs(x_fake, 'z_perturb', 0)
+        x,x_c = evaluator.create_samples_perturbSeg(z_test_same,z_lab_same,n_samples)
+        logger.add_imgs(x, 'z_perturb', 0)
+        logger.add_imgs(x_c, 'z_perturb',1)
         sys.exit()
 
 
