@@ -37,6 +37,7 @@ parser.add_argument('--nepochs', type=int, default=250, help='number of epochs t
 parser.add_argument('--model_it', type=int, default=-1, help='which model iteration to load from, -1 loads the most recent model')
 parser.add_argument('--devices', nargs='+', type=str, default=['0','1'], help='devices to use')
 parser.add_argument('--eval_mode', action='store_true', help='save sample images')
+parser.add_argument('--perturb_seg', action='store_true', help='save sample images with perturbed seg')
 parser.add_argument('--niterBeforeLRDecay', type=int, default=100, help='number of epochs to run before lr decay')
 parser.add_argument('--niter_decay', type=int, default=100, help='number of epochs to run before lr decay')
 
@@ -71,7 +72,7 @@ def see_cluster_frequency(train_loader, encoder):
 
 def init_weights(m):
     classname = m.__class__.__name__
-    if classname.find('Conv') != -1:
+    if classname.find('Conv') != -1 and classname!= "Conv2dBlock":
         m.weight.data.normal_(0.0, 0.02)
         if m.bias is not None:
             m.bias.data.fill_(0)
@@ -270,7 +271,7 @@ def main():
                       encdec_optimizer=encdec_optimizer,
                       gan_type=config['training']['gan_type'],
                       con_loss = config['training']['con_loss'] if 'con_loss' in config['training'] else False,
-                      entropy_loss=config['training']['entropy_loss'] if 'entropy_loss' in config['training'] else False,
+                      equiv_loss=  config['training']['equiv_loss'] if 'equiv_loss' in config['training'] else False,
                       decDeterministic = config['decoder']['deterministicOnSeg'],
                       lambda_LabConLoss = config['training']['lambda_LabConLoss'] if 'lambda_LabConLoss' in config['training'] else 1,
                       n_locallabels=config['encoder']['n_locallabels'],
@@ -285,7 +286,6 @@ def main():
             z_lab = zdist_lab.sample((n_samples,))
             z_test_same = zdist.sample((1,))
             z_test_same = torch.cat((z_test_same,) * n_samples, dim=0)
-            print(z_test_same.size())
             x,_ = evaluator.create_samples_labelGen(z_test_same, z_lab, out_dir=out_dir)
             logger.add_imgs(x, 'sameZImg', i)
 
@@ -294,11 +294,42 @@ def main():
             z_test = zdist.sample((n_samples,))
             z_lab_same = zdist_lab.sample((1,))
             z_lab_same = torch.cat((z_lab_same,) * n_samples, dim=0)
-            print(z_lab_same.size())
             x,x_c = evaluator.create_samples_labelGen(z_test, z_lab_same, out_dir=out_dir)
             x = torch.cat((torch.unsqueeze(x_c[0].float().cuda(),dim=0), x), dim = 0)
             logger.add_imgs(x, 'sameZLab', i)
         sys.exit()
+
+    if args.perturb_seg:
+        n_locallabels = config['encoder']['n_locallabels']
+        n_samples = 16
+        z_test_same = zdist.sample((1,))
+        z_test_same = torch.cat((z_test_same,) * n_samples, dim=0)
+        z_lab_same = zdist_lab.sample((1,))
+        label_generator.eval()
+        decoder.eval()
+        with torch.no_grad():
+            _, label_map = label_generator_test(z_lab_same)
+        segs = [label_map]
+        x = torch.argmax(label_map, dim=1)
+        for _ in range(n_samples-1):
+            i = np.random.randint(0,15)
+            j = np.random.randint(0, 15)
+            print(i,j)
+            label_map_p = x
+            print(label_map_p[0,i,j])
+            label_map_p[0,i,j]= (label_map_p[0,i,j] + 1) % n_locallabels
+            label_map_p = torch.unsqueeze(label_map_p, dim=1)
+            bs, _, h, w = label_map_p.size()
+            input_label = torch.cuda.FloatTensor(bs, n_locallabels, h, w).zero_()
+            y_hard = input_label.scatter_(1, label_map_p.long().cuda(), 1.0)
+            segs.append(y_hard)
+        segs = torch.cat(segs, dim = 0)
+        with torch.no_grad():
+            print(segs.size(), z_test_same.size())
+            x_fake = decoder_test(seg=segs, input=z_test_same)
+        logger.add_imgs(x_fake, 'z_perturb', 0)
+        sys.exit()
+
 
     # see_cluster_frequency(train_loader, encoder)
     print('Start training...')

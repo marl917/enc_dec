@@ -24,8 +24,10 @@ class Trainer(object):
                  disc_optimizer=None,
                  encdec_optimizer=None,
                  decDeterministic = False,
+
                  con_loss = False,
-                 entropy_loss = False,
+                 equiv_loss =False,
+
                  lambda_LabConLoss=1,
                  n_locallabels=0,
                  reg_type=None,
@@ -49,10 +51,18 @@ class Trainer(object):
         self.n_locallabels = n_locallabels
 
         self.con_loss = con_loss
-        self.entropy_loss = entropy_loss
+        self.equiv_loss = equiv_loss
         self.decDeterministic = decDeterministic
         print("TRAINING WITH CON LOSS : ", con_loss)
-        print("TRAINING WITH ENTROPY LOSS : ", entropy_loss)
+        print("TRAINING WITH EQUIV LOSS : ", equiv_loss)
+
+        if self.equiv_loss:
+            self.cj_transform = transforms.Compose([
+                transforms.ToPILImage(),
+                transforms.ColorJitter(
+                    brightness=0.3, contrast=0.3, saturation=0.2, hue=0.2),
+                transforms.ToTensor(), ])
+            self.kl = nn.KLDivLoss(reduction='batchmean')
 
 
     def normalNLLLoss(self, x, mu, var):
@@ -92,8 +102,6 @@ class Trainer(object):
         # first part : train label generator and img decoder
         seg_fake_unorm, seg_fake = self.label_generator(z_lab)
         x_fake = self.decoder(seg = seg_fake, input = z)  #seg fake detach
-        # print("x_fake max min", x_fake.size(), seg_fake.size())
-        # print("x_real max min : ", torch.min(x_real), torch.max(x_real))
         g_fake = self.discriminator(x_fake,  seg=seg_fake)
 
 
@@ -106,21 +114,9 @@ class Trainer(object):
             G_losses['con_loss_img'] = con_loss_img.item()
             G_losses['con_loss_lab'] = con_loss_lab.item()
             # print("mu and var max min", torch.min(var), torch.max(var))
+
         #second part : train encoder
-
         label_map_real_unorm, label_map_real= self.encoder(x_real)
-
-        entropy_loss = torch.tensor(0., device='cuda')
-        if self.entropy_loss:
-            argmax_labMap_real  = torch.argmax(label_map_real, dim = 1)
-            proba = torch.bincount(argmax_labMap_real.view(-1), minlength=self.n_locallabels)
-            proba = proba.float()/torch.sum(proba)
-            entropy_loss = proba * torch.log(proba)
-            entropy_loss[entropy_loss!=entropy_loss] =0
-            entropy_loss = torch.sum(entropy_loss)
-            G_losses['entropy loss'] = entropy_loss.item()
-
-        # print("encoder : ", label_map_real.size())
         g_real_enc = self.discriminator(x_real, seg=label_map_real)
 
         if len(g_fake)>2:
@@ -131,7 +127,27 @@ class Trainer(object):
         G_losses['gloss'] = gloss.item()
 
 
-        tot_loss = (gloss + con_loss_lab + con_loss_img + entropy_loss).mean()
+        #third part : equivariance loss
+        equiv_loss = torch.tensor(0., device='cuda')
+        if self.equiv_loss:
+            # trasnformed images passed through the encoder
+            images_cj = (x_real + 1.0) / 2.0
+            images_cj = images_cj.cpu()
+            for b in range(images_cj.shape[0]):
+                images_cj[b] = torch.from_numpy((self.cj_transform(images_cj[b]).numpy() * 2) - 1)
+            images_cj = images_cj.cuda()
+            images_tps = images_cj.flip(-1)
+            label_tps_unorm, label_tps_hard = self.encoder(images_tps)
+
+            # directly transform the label map from the original img
+            true_label_d = label_map_real_unorm.detach()
+            true_label_d.requires_grad = False
+            true_label_trans = true_label_d.flip(-1)
+
+            equiv_loss = 0.1 * self.kl(F.log_softmax(label_tps_unorm, dim=1), F.softmax(true_label_trans, dim=1))
+            G_losses['equiv_loss'] = equiv_loss.item()
+
+        tot_loss = (gloss + con_loss_lab + con_loss_img + equiv_loss).mean()
         tot_loss.backward()
 
         # for p in self.encoder.parameters():
