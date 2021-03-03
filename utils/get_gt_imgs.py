@@ -42,7 +42,7 @@ def get_transform(size):
 
 
 def get_gt_samples(dataset, nimgs=50000):
-    if dataset != 'cifar' and dataset!='lsun':
+    if dataset not in ['cifar','lsun', 'lsun_bedroom']:
         transform = get_transform(sizes[dataset])
         all_images = get_images(paths[dataset], nimgs)
         print(paths[dataset], dataset)
@@ -59,7 +59,19 @@ def get_gt_samples(dataset, nimgs=50000):
         for x, y in tqdm(data):
             i+=1
             images.append(x)
-            if i>50000:
+            if i>=50000:
+                break
+        return pt_to_np(torch.stack(images))
+    elif dataset == 'lsun_bedroom':
+        data = datasets.LSUN(root='data/lsun_bedroom/train',
+                                   classes=['bedroom_train'],
+                                   transform=get_transform(sizes[dataset]))
+        images = []
+        i=0
+        for x, y in tqdm(data):
+            i+=1
+            images.append(x)
+            if i>=50000:
                 break
         return pt_to_np(torch.stack(images))
 
@@ -76,10 +88,11 @@ paths = {
     'imagenet': 'data/ImageNet',
     'places': 'data/Places365',
     'cifar': 'data/CIFAR',
-    'lsun': 'data/lsun'
+    'lsun': 'data/lsun',
+    'lsun_bedroom':'data/lsun_bedroom'
 }
 
-sizes = {'imagenet': 128, 'places': 128, 'cifar': 32, 'lsun': 64}
+sizes = {'imagenet': 128, 'places': 128, 'cifar': 32, 'lsun': 64,'lsun_bedroom': 64}
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser('Save a batch of ground truth train set images for evaluation')
@@ -87,6 +100,7 @@ if __name__ == "__main__":
     parser.add_argument('--imagenet', action='store_true')
     parser.add_argument('--places', action='store_true')
     parser.add_argument('--lsun', action='store_true')
+    parser.add_argument('--lsun_bedroom', action='store_true')
     args = parser.parse_args()
 
     os.makedirs('output', exist_ok=True)
@@ -103,3 +117,6 @@ if __name__ == "__main__":
     if args.lsun:
         lsun_samples = get_gt_samples('lsun', nimgs=50000)
         np.savez('output/lsun_gt_imgs.npz', fake=lsun_samples, real=lsun_samples)
+    if args.lsun_bedroom:
+        lsun_samples = get_gt_samples('lsun_bedroom', nimgs=50000)
+        np.savez('output/lsun_bedroom_gt_imgs.npz', fake=lsun_samples, real=lsun_samples)
