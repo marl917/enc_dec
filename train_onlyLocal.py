@@ -301,12 +301,13 @@ def main():
 
     if args.perturb_seg:
         n_samples = 16
-        z_test_same = zdist.sample((1,))
-        z_test_same = torch.cat((z_test_same,) * n_samples, dim=0)
-        z_lab_same = zdist_lab.sample((1,))
-        x,x_c = evaluator.create_samples_perturbSeg(z_test_same,z_lab_same,n_samples)
-        logger.add_imgs(x, 'z_perturb', 0)
-        logger.add_imgs(x_c, 'z_perturb',1)
+        for k in range(10):
+            z_test_same = zdist.sample((1,))
+            z_test_same = torch.cat((z_test_same,) * n_samples, dim=0)
+            z_lab_same = zdist_lab.sample((1,))
+            x,x_c = evaluator.create_samples_perturbSeg(z_test_same,z_lab_same,n_samples)
+            logger.add_imgs(x, 'z_perturb', 2*k)
+            logger.add_imgs(x_c, 'z_perturb',2*k+1)
         sys.exit()
 
 

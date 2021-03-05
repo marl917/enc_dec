@@ -158,12 +158,13 @@ class Evaluator(object):
         segs = [label_map]
         x = torch.argmax(label_map, dim=1)
         for _ in range(n_samples - 1):
-            label_map_p = x
-            for i in range(7):
-                for j in range(7):
-                    # i = np.random.randint(0,15)
-                    # j = np.random.randint(0, 15)
+            label_map_p = x.clone()
+            for i in range(8):
+                for j in range(8):
+                    # k = np.random.randint(0,15)
+                    # l = np.random.randint(0, 15)
                     label_map_p[0, i, j] = (label_map_p[0, i, j] + np.random.randint(1, 4)) % self.n_locallabels
+                    # label_map_p[0, k, l] = (label_map_p[0, k, l] + np.random.randint(1, 4)) % self.n_locallabels
             label_map_p = torch.unsqueeze(label_map_p, dim=1)
             bs, _, h, w = label_map_p.size()
             input_label = torch.cuda.FloatTensor(bs, self.n_locallabels, h, w).zero_()
