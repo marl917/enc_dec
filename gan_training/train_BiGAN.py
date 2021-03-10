@@ -31,7 +31,8 @@ class Trainer(object):
                  lambda_LabConLoss=1,
                  n_locallabels=0,
                  reg_type=None,
-                 reg_param=None):
+                 reg_param=None,
+                 con_loss_img=True):
 
         self.decoder = decoder
         self.encoder = encoder
@@ -51,6 +52,7 @@ class Trainer(object):
         self.n_locallabels = n_locallabels
 
         self.con_loss = con_loss
+        self.con_loss_img = con_loss_img
         self.equiv_loss = equiv_loss
         self.decDeterministic = decDeterministic
         print("TRAINING WITH CON LOSS : ", con_loss)
@@ -110,7 +112,8 @@ class Trainer(object):
         if self.con_loss:
             mu_lab, var_lab, mu_img, var_img = self.qhead_discriminator(g_fake[0])
             con_loss_lab = self.normalNLLLoss(z_lab, mu_lab, var_lab) * self.lambda_LabConLoss
-            con_loss_img = self.normalNLLLoss(z, mu_img, var_img) * 0.1
+            if self.con_loss_img:
+                con_loss_img = self.normalNLLLoss(z, mu_img, var_img) * 0.1
             G_losses['con_loss_img'] = con_loss_img.item()
             G_losses['con_loss_lab'] = con_loss_lab.item()
             # print("mu and var max min", torch.min(var), torch.max(var))
@@ -153,13 +156,13 @@ class Trainer(object):
         # for p in self.encoder.parameters():
         #     print(p.grad)
         # sys.exit()
-        if check_norm and False:
-            total_norm = 0
-            for p in self.decoder.parameters():
-                param_norm = p.grad.data.norm(2)
-                total_norm += param_norm.item() ** 2
-                total_norm = total_norm ** (1. / 2)
-                print(total_norm)
+        # if check_norm and False:
+        #     total_norm = 0
+        #     for p in self.decoder.parameters():
+        #         param_norm = p.grad.data.norm(2)
+        #         total_norm += param_norm.item() ** 2
+        #         total_norm = total_norm ** (1. / 2)
+        #         print(total_norm)
 
         self.encdec_optimizer.step()
 

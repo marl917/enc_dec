@@ -57,6 +57,19 @@ class Logger(object):
         elif self.monitoring == 'tensorboard':
             self.tb.add_scalar(k_name, v, it)
 
+    def add_label_map(self, imgs, class_name, it):
+        outdir = os.path.join(self.img_dir, class_name)
+        if not os.path.exists(outdir):
+            os.makedirs(outdir)
+        outfile = os.path.join(outdir, '%08d.png' % it)
+
+        imgs = imgs / 255.
+        imgs = torchvision.utils.make_grid(imgs)
+        torchvision.utils.save_image(copy.deepcopy(imgs), outfile, nrow=8)
+
+        if self.monitoring == 'tensorboard':
+            self.tb.add_image(class_name, copy.deepcopy(imgs), it)
+
     def add_imgs(self, imgs, class_name, it):
         outdir = os.path.join(self.img_dir, class_name)
         if not os.path.exists(outdir):

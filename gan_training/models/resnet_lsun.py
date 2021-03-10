@@ -11,7 +11,7 @@ from torch.nn.utils.spectral_norm import spectral_norm
 
 class Decoder(nn.Module):
     def __init__(self,
-                 nlabels,
+
                  local_nlabels=0,
                  z_dim=128,
                  nc=3,
@@ -91,7 +91,7 @@ class Decoder(nn.Module):
 
 class MunitEncoder(nn.Module):
     def __init__(self,
-                 nlabels,
+
                  local_nlabels,
                  img_size,
                  label_size =0,
@@ -104,7 +104,7 @@ class MunitEncoder(nn.Module):
         # s0 = self.s0 = img_size // 32
         print("img size in encoder :", img_size)
         nf = self.nf = nfilter
-        self.nlabels = nlabels
+
         self.local_nlabels = local_nlabels
         self.img_size =img_size
         self.label_size = label_size
@@ -160,12 +160,10 @@ class MunitEncoder(nn.Module):
 
 class Encoder(nn.Module):
     def __init__(self,
-                 nlabels,
                  local_nlabels,
                  img_size,
                  label_size =0,
                  nfilter=64,
-                 features='penultimate',
                  deeper_arch=False,
                  batchnorm=True,
                  **kwargs):
@@ -173,7 +171,6 @@ class Encoder(nn.Module):
         # s0 = self.s0 = img_size // 32
         print("img size in encoder :", img_size)
         nf = self.nf = nfilter
-        self.nlabels = nlabels
         self.local_nlabels = local_nlabels
         self.img_size =img_size
         self.label_size = label_size
@@ -269,7 +266,7 @@ class Encoder(nn.Module):
 class LabelGenerator(nn.Module):
     def __init__(self,
                  z_dim,
-                 nlabels,
+
                  label_size,
                  local_nlabels=0,
                  conditioning=None,
@@ -281,7 +278,7 @@ class LabelGenerator(nn.Module):
 
         print(label_size)
         nf = self.nf = nfilter
-        self.nlabels = nlabels
+
         self.z_dim = z_dim
         self.local_nlabels = local_nlabels
 
@@ -370,19 +367,17 @@ class LabelGenerator(nn.Module):
 
 class BiGANDiscriminator(nn.Module):
     def __init__(self,
-                 nlabels,
                  local_nlabels,
                  img_size,
                  label_size,
                  nfilter=64,
                  noSegPath=True,
-                 case=0,
                  **kwargs):
         super().__init__()
         s0 = self.s0 = label_size
         print("value of s0 (label size) in BiGAN DISC : ", s0)
         nf = self.nf = nfilter
-        self.nlabels = nlabels
+
         self.local_nlabels = local_nlabels
         self.img_size = img_size
         self.label_size =label_size
@@ -523,7 +518,6 @@ class BiGANDiscriminator(nn.Module):
 
 class smallBiGANDiscriminator(nn.Module):
     def __init__(self,
-                 nlabels,
                  local_nlabels,
                  img_size,
                  label_size,
@@ -706,8 +700,6 @@ class smallBiGANDiscriminator(nn.Module):
 
 class BiGANQHeadDiscriminator(nn.Module):
     def __init__(self,
-                 nlabels,
-                 local_nlabels=None,
                  size=None,
                  z_dim_lab=1,
                  z_dim_img=1,
@@ -716,8 +708,6 @@ class BiGANQHeadDiscriminator(nn.Module):
                  **kwargs):
         super(BiGANQHeadDiscriminator, self).__init__()
         self.ndf = ndf
-        self.nlabels = nlabels
-        self.local_nlabels = local_nlabels
         self.qhead_variant = qhead_variant
 
         # self.conv1 = nn.Conv2d(ndf *16, 512, 8, bias=False)

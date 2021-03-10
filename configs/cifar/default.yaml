@@ -4,31 +4,20 @@ data:
   img_size: 32
   nlabels: 10
 decoder:
-  name: dcgan_deep_local_clust
-  nlabels: 1
-  conditioning: unconditional
-  kwargs:
-    placeholder: None
+  name: cifar_bigan
+  zdim: 5
 encoder:
-  name: dcgan_deep_local_clust
-  nlabels: 1
-  conditioning: unconditional
-  kwargs:
-    placeholder: None
+  name: cifar_bigan
 label_generator:
   label_size: 8
-  name: dcgan_label_gen
-  zdim: 50
-  kwargs:
-    placeholder: None
+  name: cifar_bigan
+  zdim: 30
+discriminator:
+  name: cifar_bigan
+qhead_discriminator:
+  name: cifar_bigan
 z_dist:
   type: uniform
-  dim: 128
-clusterer:
-  name: supervised
-  nimgs: 10000
-  kwargs: 
-    placeholder: None
 training:
   gan_type: standard
   reg_type: none

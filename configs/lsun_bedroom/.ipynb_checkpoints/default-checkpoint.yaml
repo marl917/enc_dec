@@ -6,19 +6,29 @@ data:
   nlabels: 1000
 decoder:
   name: resnet_lsun
-  zdim: 10
+  nlabels: 1
+  conditioning: unconditional
+  kwargs:
+    placeholder: None
 encoder:
   name: resnet_lsun
+  nlabels: 1
+  conditioning: unconditional
+  kwargs:
+    placeholder: None
 label_generator:
   label_size: 16
   name: resnet_lsun
   zdim: 50
+  kwargs:
+    placeholder: None
 discriminator:
   name: resnet_lsun
 qhead_discriminator:
   name: resnet_lsun
 z_dist:
   type: uniform
+  dim: 256
 training:
   gan_type: standard
   reg_type: none

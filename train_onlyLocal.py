@@ -11,7 +11,7 @@ import torch
 import numpy as np
 from torch import nn
 from torch.nn import init
-
+import matplotlib.pyplot as plt 
 from gan_training import utils
 
 from gan_training.train_BiGAN import Trainer, update_average
@@ -57,13 +57,13 @@ def see_cluster_frequency(train_loader, encoder):
         _,label_maps = encoder(x_batch)
         index = torch.argmax(label_maps, dim = 1)
         print(index[:5])
-        count = torch.bincount(index[:,0,0].view(-1), minlength=config['encoder']['n_locallabels'])
+        count = torch.bincount(index[:,0,0].view(-1), minlength=config['label_generator']['n_locallabels'])
         tot_count = tot_count + count
     if (x_test.size(0) % batch_size != 0):
         x_batch = x_test[x_test.size(0) // batch_size * batch_size:].cuda()
         _, label_maps = encoder(x_batch)
         index = torch.argmax(label_maps, dim=1)
-        count = torch.bincount(index[:,0,0].view(-1), minlength=config['encoder']['n_locallabels'])
+        count = torch.bincount(index[:,0,0].view(-1), minlength=config['label_generator']['n_locallabels'])
         tot_count = tot_count + count
     torch.set_printoptions(precision=6, sci_mode=False)
     print(torch.sum(tot_count), tot_sum)
@@ -198,7 +198,10 @@ def main():
                     monitoring_dir=path.join(out_dir, 'monitoring'))
 
     # Distributions
-    zdist = get_zdist(config['z_dist']['type'], config['z_dist']['dim'], device=device)
+    if 'sean' in config['decoder']['name']:
+        zdist = get_zdist(config['z_dist']['type'], (config['label_generator']['n_locallabels'],config['decoder']['zdim']), device=device)
+    else:
+        zdist = get_zdist(config['z_dist']['type'], config['decoder']['zdim'], device=device)
     zdist_lab = get_zdist(config['z_dist']['type'], config['label_generator']['zdim'], device=device)
 
     ntest = config['training']['ntest']
@@ -257,7 +260,7 @@ def main():
         batch_size=batch_size,
         device=device,
         inception_nsamples=config['training']['inception_nsamples'],
-        n_locallabels=config['encoder']['n_locallabels'])
+        n_locallabels=config['label_generator']['n_locallabels'])
 
     # Trainer
     # print(label_discriminator)
@@ -271,10 +274,11 @@ def main():
                       encdec_optimizer=encdec_optimizer,
                       gan_type=config['training']['gan_type'],
                       con_loss = config['training']['con_loss'] if 'con_loss' in config['training'] else False,
+                      con_loss_img=config['training']['con_loss_img'] if 'con_loss_img' in config['training'] else True,
                       equiv_loss=  config['training']['equiv_loss'] if 'equiv_loss' in config['training'] else False,
                       decDeterministic = config['decoder']['deterministicOnSeg'],
                       lambda_LabConLoss = config['training']['lambda_LabConLoss'] if 'lambda_LabConLoss' in config['training'] else 1,
-                      n_locallabels=config['encoder']['n_locallabels'],
+                      n_locallabels=config['label_generator']['n_locallabels'],
                       reg_type=config['training']['reg_type'],
                       reg_param=config['training']['reg_param']
                       )
@@ -282,12 +286,46 @@ def main():
     if args.eval_mode:
         # test with same z_img, different segmentations
         n_samples = 16
-        for i in range(20):
+        hist=False
+        if hist:
+            lg = evaluator.count_labels()
+            e = evaluator.count_labels(labelgen=False)
+            print(e)
+            a= np.arange(config['label_generator']['n_locallabels'])
+            print(lg.cpu().numpy().shape,a.shape)
+            #plt.hist(a,np.arange(config['label_generator']['n_locallabels']), weights=e.cpu().numpy())
+            fig = plt.figure()
+            ax = fig.add_subplot(111)
+            plt.hist([a,a],np.arange(config['label_generator']['n_locallabels']+1), weights=[lg.cpu().numpy(),e.cpu().numpy()], color=["red", "lime"], label=["from Label Generator", "from Encoder"])
+            ax.legend(prop={'size': 10})
+            ax.set_title("Label frequencies")
+            ax.set_xlabel('Label indices')
+            ax.set_ylabel("Number of occurences for 50000 label maps")
+            plt.show()
+
+            sys.exit()
+
+        # x,x_mod = evaluator.create_samples_perturbSeg()
+        # logger.add_imgs(x, 'all', 10)
+        # logger.add_imgs(x_mod,"all",11)
+        # sys.exit()
+        z_test = zdist.sample((ntest,))
+        x, lab_color = evaluator.create_samples(x_test, z_test)
+        logger.add_imgs(x, 'all', 1)
+        logger.add_label_map(lab_color, 'all',  2)
+
+        co = evaluator.display_colors()
+        logger.add_label_map(co, 'labels_code_color', 100000)
+
+
+        # sys.exit()
+        for i in range(10):
             z_lab = zdist_lab.sample((n_samples,))
             z_test_same = zdist.sample((1,))
             z_test_same = torch.cat((z_test_same,) * n_samples, dim=0)
-            x,_ = evaluator.create_samples_labelGen(z_test_same, z_lab, out_dir=out_dir)
-            logger.add_imgs(x, 'sameZImg', i)
+            x,c= evaluator.create_samples_labelGen(z_test_same, z_lab, out_dir=out_dir)
+            logger.add_imgs(x, 'sameZImg', 2*i)
+            logger.add_label_map(c, 'sameZImg', 2*i+1)
 
         # test with different z_img, same seg
         for i in range(20):
@@ -295,19 +333,9 @@ def main():
             z_lab_same = zdist_lab.sample((1,))
             z_lab_same = torch.cat((z_lab_same,) * n_samples, dim=0)
             x,x_c = evaluator.create_samples_labelGen(z_test, z_lab_same, out_dir=out_dir)
+            # x and x_c aren4t in the same range
             x = torch.cat((torch.unsqueeze(x_c[0].float().cuda(),dim=0), x), dim = 0)
             logger.add_imgs(x, 'sameZLab', i)
-        sys.exit()
-
-    if args.perturb_seg:
-        n_samples = 16
-        for k in range(10):
-            z_test_same = zdist.sample((1,))
-            z_test_same = torch.cat((z_test_same,) * n_samples, dim=0)
-            z_lab_same = zdist_lab.sample((1,))
-            x,x_c = evaluator.create_samples_perturbSeg(z_test_same,z_lab_same,n_samples)
-            logger.add_imgs(x, 'z_perturb', 2*k)
-            logger.add_imgs(x_c, 'z_perturb',2*k+1)
         sys.exit()
 
 
@@ -325,11 +353,12 @@ def main():
 
         for x_real, y in train_loader:
             it += 1
+            # print(it)
 
             x_real, y = x_real.to(device), y
             z = zdist.sample((batch_size, ))
             z_lab = zdist_lab.sample((batch_size,))
-            zbis = zdist.sample((batch_size,))
+            # print("z size : ", z.size())
 
             gloss = trainer.encoderdecoder_trainstep(x_real, z, z_lab=z_lab, check_norm = (it%200 ==0))
 
@@ -356,19 +385,20 @@ def main():
                 z_test = zdist.sample((ntest,))
                 x, lab_color = evaluator.create_samples(x_test, z_test)
                 logger.add_imgs(x, 'all', it)
-                logger.add_imgs(lab_color, 'all', it+2)
+                logger.add_label_map(lab_color, 'all', it+2)
 
                 z_lab = zdist_lab.sample((ntest,))
                 x,_ = evaluator.create_samples_labelGen(z_test, z_lab, out_dir=out_dir)
                 logger.add_imgs(x, 'all', it+1)
 
-                with torch.no_grad():
-                    _, label_map = label_generator(z_lab)
-                    x_fake = decoder(seg=label_map, input=z_test)
-                    logger.add_imgs(x_fake, 'all', it + 3)
+
+                # with torch.no_grad():
+                #     _, label_map = label_generator(z_lab)
+                #     x_fake = decoder(seg=label_map, input=z_test)
+                #     logger.add_imgs(x_fake, 'all', it + 3)
 
             # (ii) Compute inception if necessary
-            if (it - 1) % inception_every == 0 and it > 1 and False or it == 5001:
+            if (it - 1) % inception_every == 0 and it > 1 or it == 5001:
                 print('PyTorch Inception score...')
                 inception_mean_label, inception_std_label = evaluator.compute_inception_score(labelgen=True)
                 logger.add('metrics', 'pt_inception_mean', inception_mean_label, it=it)

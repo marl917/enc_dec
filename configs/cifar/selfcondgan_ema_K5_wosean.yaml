@@ -1,0 +1,29 @@
+decoder:
+  name: cifar_bigan
+  deterministicOnSeg: True
+  zdim: 1
+encoder:
+  kwargs:
+    deeper_arch: False
+    classifier_mod: False
+discriminator:
+  kwargs:
+    noSegPath: 3
+label_generator:
+  zdim: 50
+  label_size: 8
+  n_locallabels: 10
+  kwargs:
+    deeper_arch: False
+inherit_from: configs/cifar/default.yaml
+training:
+  out_dir: output/cifar/labelRes8_K10_ZLab50_wosean_detOnSeg_Compare_woBNEnc
+  reg_param: 0.1
+  con_loss: True
+  con_loss_img: False
+  lambda_LabConLoss: 0.1
+  entropy_loss: False
+  take_model_average: False
+  fid_every: 10000
+  sample_every: 1000
+

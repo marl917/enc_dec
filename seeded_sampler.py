@@ -38,7 +38,6 @@ class SeededSampler():
 
         self.model_path = model_path
         self.rootdir = rootdir
-        self.nlabels = self.config['decoder']['nlabels']
         self.device = device
         self.pretrained = pretrained
 

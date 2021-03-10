@@ -1,14 +1,15 @@
-from gan_training.models import (resnet2, dcgan_label_gen, dcgan_deep_onlylocal_clust, resnet, resnet_lsun, resnet_lsun256)
+from gan_training.models import (resnet2, cifar_BiGAN, resnet, resnet_lsun, resnet_lsun256)
 
 decoder_dict = {
-    'dcgan_deep_onlylocal_clust': dcgan_deep_onlylocal_clust.Decoder,
+    'cifar_bigan': cifar_BiGAN.Decoder,
+    'cifar_bigan_sean': cifar_BiGAN.SEANDecoder,
     'resnet' : resnet.Decoder,
     'resnet_lsun': resnet_lsun.Decoder,
     'resnet_lsun256': resnet_lsun256.Decoder
 }
 
 encoder_dict = {
-    'dcgan_deep_onlylocal_clust':dcgan_deep_onlylocal_clust.Encoder,
+    'cifar_bigan':cifar_BiGAN.Encoder,
     'resnet': resnet.Encoder,
     'resnet_lsun': resnet_lsun.Encoder,
     'resnet_lsun256': resnet_lsun256.Encoder,
@@ -17,8 +18,7 @@ encoder_dict = {
 
 
 discriminator_dict = {
-    'dcgan_deep_onlylocal_clust_bigan': dcgan_deep_onlylocal_clust.BiGANDiscriminator,
-    'dcgan_deep_onlylocal_clust_LocalGlob': dcgan_deep_onlylocal_clust.LocalAndGlobalDiscriminator,
+    'cifar_bigan': cifar_BiGAN.BiGANDiscriminator,
     'resnet': resnet.BiGANDiscriminator,
     'resnet_lsun': resnet_lsun.BiGANDiscriminator,
     'resnet_lsun256': resnet_lsun256.BiGANDiscriminator,
@@ -26,19 +26,15 @@ discriminator_dict = {
 }
 
 label_generator_dict = {
-    'dcgan_label_gen': dcgan_label_gen.Generator,
+    'cifar_bigan': cifar_BiGAN.LabelGenerator,
     'resnet': resnet.LabelGenerator,
     'resnet_lsun': resnet_lsun.LabelGenerator,
 'resnet_lsun256': resnet_lsun256.LabelGenerator
 }
 
 qhead_discriminator_dict = {
-    'dcgan_deep_onlylocal_clust_bigan': dcgan_deep_onlylocal_clust.BiGANQHeadDiscriminator,
+    'cifar_bigan': cifar_BiGAN.BiGANQHeadDiscriminator,
     'resnet': resnet.BiGANQHeadDiscriminator,
     'resnet_lsun': resnet_lsun.BiGANQHeadDiscriminator,
 'resnet_lsun256': resnet_lsun256.BiGANQHeadDiscriminator
-}
-
-label_discriminator_dict = {
-    'dcgan_label_gen': dcgan_label_gen.LabDiscriminator
 }

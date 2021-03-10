@@ -3,9 +3,10 @@ from torch import nn
 from torch.autograd import Variable
 from torch.nn import functional as F
 import torch.nn.utils.spectral_norm as spectral_norm
+import sys
 
 class SPADEResnetBlock(nn.Module):
-    def __init__(self, fin, fout, local_nlabels, detOnSeg):
+    def __init__(self, fin, fout, local_nlabels):
         super().__init__()
         # Attributes
         self.learned_shortcut = (fin != fout)
@@ -25,10 +26,10 @@ class SPADEResnetBlock(nn.Module):
             self.conv_s = spectral_norm(self.conv_s)
 
         # define normalization layers
-        self.norm_0 = SPADE(fin, local_nlabels, detOnSeg)
-        self.norm_1 = SPADE( fmiddle, local_nlabels,detOnSeg)
+        self.norm_0 = SPADE(fin, local_nlabels)
+        self.norm_1 = SPADE( fmiddle, local_nlabels)
         if self.learned_shortcut:
-            self.norm_s = SPADE(fin, local_nlabels,detOnSeg)
+            self.norm_s = SPADE(fin, local_nlabels)
 
     # note the resnet block with SPADE also takes in |seg|,
     # the semantic segmentation map as input
@@ -51,13 +52,11 @@ class SPADEResnetBlock(nn.Module):
         return F.leaky_relu(x, 2e-1)
 
 class SPADE(nn.Module):
-    def __init__(self, norm_nc, label_nc,detOnSeg):
+    def __init__(self, norm_nc, label_nc):
         super().__init__()
         ks = 3
-        if detOnSeg:
-            self.param_free_norm = nn.InstanceNorm2d(norm_nc, affine=False)
-        else:
-            self.param_free_norm = nn.BatchNorm2d(norm_nc, affine=False)
+
+        self.param_free_norm = nn.BatchNorm2d(norm_nc, affine=False)
 
         # The dimension of the intermediate embedding space. Yes, hardcoded.
         nhidden = 128
@@ -84,6 +83,188 @@ class SPADE(nn.Module):
         # apply scale and bias
         out = normalized * (1 + gamma) + beta
 
+        return out
+
+class SEANResnetBlock(nn.Module):
+    def __init__(self, fin, fout, local_nlabels, use_rgb=True):
+        super(SEANResnetBlock, self).__init__()
+
+        self.use_rgb = use_rgb
+
+        # Attributes
+        self.learned_shortcut = (fin != fout)
+        fmiddle = min(fin, fout)
+
+        # create conv layers
+        self.conv_0 = nn.Conv2d(fin, fmiddle, kernel_size=3, padding=1)
+        self.conv_1 = nn.Conv2d(fmiddle, fout, kernel_size=3, padding=1)
+        if self.learned_shortcut:
+            self.conv_s = nn.Conv2d(fin, fout, kernel_size=1, bias=False)
+
+
+        self.conv_0 = spectral_norm(self.conv_0)
+        self.conv_1 = spectral_norm(self.conv_1)
+        if self.learned_shortcut:
+            self.conv_s = spectral_norm(self.conv_s)
+
+
+        self.ace_0 = ACE(fin, local_nlabels, use_rgb=use_rgb)
+        self.ace_1 = ACE(fmiddle, local_nlabels, use_rgb=use_rgb)
+        if self.learned_shortcut:
+            self.ace_s = ACE(fin,local_nlabels, use_rgb=use_rgb)
+
+    def forward(self, x, seg, style_codes):
+        x_s = self.shortcut(x, seg, style_codes)
+        dx = self.ace_0(x, seg, style_codes)
+        dx = self.conv_0(self.actvn(dx))
+        dx = self.ace_1(dx, seg, style_codes)
+        dx = self.conv_1(self.actvn(dx))
+        out = x_s + dx
+        return out
+
+    def shortcut(self, x, seg, style_codes):
+        if self.learned_shortcut:
+            x_s = self.ace_s(x, seg, style_codes)
+            x_s = self.conv_s(x_s)
+        else:
+            x_s = x
+        return x_s
+
+    def actvn(self, x):
+        return F.leaky_relu(x, 2e-1)
+
+class ACE(nn.Module):
+    def __init__(self, norm_nc, n_locallabels, use_rgb=True):
+        super().__init__()
+
+        self.use_rgb = use_rgb
+        self.style_length = 64
+        self.blending_gamma = nn.Parameter(torch.zeros(1), requires_grad=True)
+        self.blending_beta = nn.Parameter(torch.zeros(1), requires_grad=True)
+        self.noise_var = nn.Parameter(torch.zeros(norm_nc), requires_grad=True)
+
+        self.n_locallabels = n_locallabels
+
+        self.param_free_norm = nn.BatchNorm2d(norm_nc, affine=False)
+
+        # The dimension of the intermediate embedding space. Yes, hardcoded.
+        #for the seg part
+        nhidden = 128
+        ks=3
+        pw = ks // 2
+        self.mlp_shared = nn.Sequential(
+            nn.Conv2d(n_locallabels, nhidden, kernel_size=ks, padding=pw),
+            nn.ReLU()
+        )
+        self.mlp_gamma = nn.Conv2d(nhidden, norm_nc, kernel_size=ks, padding=pw)
+        self.mlp_beta = nn.Conv2d(nhidden, norm_nc, kernel_size=ks, padding=pw)
+
+
+        if self.use_rgb:
+            ks = 3
+            pw = ks // 2
+            self.create_gamma_beta_fc_layers()
+
+            self.conv_gamma = nn.Conv2d(self.style_length, norm_nc, kernel_size=ks, padding=pw)
+            self.conv_beta = nn.Conv2d(self.style_length, norm_nc, kernel_size=ks, padding=pw)
+
+
+
+
+    def forward(self, x, segmap, style_codes=None):
+        # Part 1. generate parameter-free normalized activations
+        added_noise = (torch.randn(x.shape[0], x.shape[3], x.shape[2], 1).cuda() * self.noise_var).transpose(1, 3)
+        normalized = self.param_free_norm(x + added_noise)
+        # normalized = self.param_free_norm(x)
+
+        # Part 2. produce scaling and bias conditioned on semantic map
+        segmap = F.interpolate(segmap, size=x.size()[2:], mode='bilinear', align_corners=True)
+
+        if self.use_rgb:
+            [b_size, f_size, h_size, w_size] = normalized.shape
+            # middle_avg = torch.zeros((b_size, self.style_length, h_size, w_size), device=normalized.device)
+
+            s = torch.unsqueeze(style_codes.permute(0,2,1), dim=3)
+            s = self.conv1x1(s)
+            s = torch.squeeze(s, dim=3)
+            # print("size bf ", s.size())
+            s = s.permute(0,2,1)
+            # print("size of s before gather", s.size())
+
+            argmax = torch.argmax(segmap, dim = 1)
+            argmax = torch.unsqueeze(argmax.reshape(b_size,-1),dim=2)
+            argmax = argmax.repeat(1,1,self.style_length)
+            # print("size of argmax before gather : ", argmax.size())
+
+            middle_avg = torch.gather(s, 1, argmax)
+            middle_avg = middle_avg.permute(0,2,1).reshape(b_size, self.style_length, h_size,w_size)
+
+            # for i in range(b_size):
+            #     for j in range(segmap.shape[1]):
+            #         component_mask_area = torch.sum(segmap.bool()[i, j])
+            #         if component_mask_area > 0:
+            #             middle_mu = F.relu(self.__getattr__('fc_mu' + str(j))(style_codes[i][j]))
+            #             component_mu = middle_mu.reshape(self.style_length, 1).expand(self.style_length, component_mask_area)
+            #
+            #             middle_avg[i].masked_scatter_(segmap.bool()[i, j], component_mu)
+
+
+            gamma_avg = self.conv_gamma(middle_avg)
+            beta_avg = self.conv_beta(middle_avg)
+
+
+
+            actv = self.mlp_shared(segmap)
+            gamma_spade = self.mlp_gamma(actv)
+            beta_spade = self.mlp_beta(actv)
+
+            gamma_alpha = F.sigmoid(self.blending_gamma)
+            beta_alpha = F.sigmoid(self.blending_beta)
+
+            gamma_final = gamma_alpha * gamma_avg + (1. - gamma_alpha) * gamma_spade
+            beta_final = beta_alpha * beta_avg + (1. - beta_alpha) * beta_spade
+
+            out = normalized * (1 + gamma_final) + beta_final
+
+        else:
+            actv = self.mlp_shared(segmap)
+            gamma_spade = self.mlp_gamma(actv)
+            beta_spade = self.mlp_beta(actv)
+            out = normalized * (1 + gamma_spade) + beta_spade
+
+        return out
+
+
+
+
+
+    def create_gamma_beta_fc_layers(self):
+
+        style_length = self.style_length
+        # for i in range(self.n_locallabels):
+        #     setattr(self, f'fc_mu{i}', nn.Linear(style_length, style_length))
+        self.conv1x1 = nn.Conv2d(style_length, style_length,1,1,0)
+        print(self.n_locallabels)
+
+
+class ResBlockMUNIT(nn.Module):
+    def __init__(self, dim):
+        super(ResBlockMUNIT, self).__init__()
+
+        model = []
+        model += [nn.ReflectionPad2d(1), nn.Conv2d(dim, dim, 3, 1),
+                                             nn.InstanceNorm2d(dim),
+                                             nn.LeakyReLU(0.2, inplace=True)]
+        model += [nn.ReflectionPad2d(1), nn.Conv2d(dim, dim, 3, 1),
+                  nn.InstanceNorm2d(dim)]
+        # model += [Conv2dBlock(dim ,dim, 3, 1, 1, norm=norm, activation=activation, pad_type=pad_type)]
+        # model += [Conv2dBlock(dim ,dim, 3, 1, 1, norm=norm, activation='none', pad_type=pad_type)]
+        self.model = nn.Sequential(*model)
+
+    def forward(self, x):
+        residual = x
+        out = self.model(x)
+        out += residual
         return out
 
 class ResnetBlock(nn.Module):

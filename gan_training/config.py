@@ -1,7 +1,7 @@
 import yaml
 from torch import optim
 from os import path
-from gan_training.models import decoder_dict, encoder_dict, discriminator_dict, label_discriminator_dict, qhead_discriminator_dict, label_generator_dict
+from gan_training.models import decoder_dict, encoder_dict, discriminator_dict, qhead_discriminator_dict, label_generator_dict
 from gan_training.train import toggle_grad
 
 
@@ -63,17 +63,15 @@ def build_models(config):
     Encoder = encoder_dict[config['encoder']['name']]
 
     # Build models
-    decoder = Decoder(z_dim=config['z_dist']['dim'],
-                      nlabels=config['decoder']['nlabels'],
+    decoder = Decoder(z_dim=config['decoder']['zdim'],
                       deterministicOnSeg = config['decoder']['deterministicOnSeg'],
-                      local_nlabels=config['decoder']['n_locallabels'],
+                      local_nlabels=config['label_generator']['n_locallabels'],
                       size=config['data']['img_size'],
                       label_size=config['label_generator']['label_size'],
                       **config['decoder']['kwargs'])
 
     encoder = Encoder(
-        nlabels=config['encoder']['nlabels'],
-        local_nlabels=config['encoder']['n_locallabels'],
+        local_nlabels=config['label_generator']['n_locallabels'],
         img_size=config['data']['img_size'],
         label_size = config['label_generator']['label_size'],
         **config['encoder']['kwargs'])
@@ -82,27 +80,22 @@ def build_models(config):
     qhead_discriminator = None
 
     Discriminator = discriminator_dict[config['discriminator']['name']]
-    discriminator = Discriminator(z_dim=config['z_dist']['dim'],
-                      nlabels=config['discriminator']['nlabels'],
-                      local_nlabels=config['discriminator']['n_locallabels'],
+    discriminator = Discriminator(
+                      local_nlabels=config['label_generator']['n_locallabels'],
                       img_size=config['data']['img_size'],
                       label_size=config['label_generator']['label_size'],
                       **config['discriminator']['kwargs'])
 
     Label_generator = label_generator_dict[config['label_generator']['name']]
     label_generator = Label_generator(z_dim=config['label_generator']['zdim'],
-                      nlabels=config['label_generator']['nlabels'],
                       local_nlabels = config['label_generator']['n_locallabels'],
                       label_size=config['label_generator']['label_size'],
-                      conditioning = config['label_generator']['conditioning'],
                       **config['label_generator']['kwargs'])
 
 
     Qhead_discriminator = qhead_discriminator_dict[config['qhead_discriminator']['name']]
     qhead_discriminator = Qhead_discriminator(z_dim_lab=config['label_generator']['zdim'],
-                                              z_dim_img = config['z_dist']['dim'],
-                  nlabels=config['discriminator']['nlabels'],
-                  local_nlabels=config['discriminator']['n_locallabels'],
+                                              z_dim_img = config['decoder']['zdim'],
                   size=config['label_generator']['label_size'],
                   qhead_variant = config['discriminator']['name'] == 'resnet_lsun_small' and config['discriminator']['kwargs']['case'] == 1,
                   **config['discriminator']['kwargs'])
