@@ -10,14 +10,14 @@ discriminator:
   kwargs:
     noSegPath: 3
 label_generator:
-  zdim: 10
+  zdim: 30
   label_size: 8
   n_locallabels: 5
   kwargs:
     deeper_arch: False
 inherit_from: configs/cifar/default.yaml
 training:
-  out_dir: output/cifar/labelRes8_K5_ZImg64_ZLab10_seanResnetBlock
+  out_dir: output/cifar/labelRes8_K5_ZImg64_ZLab30_sean
   reg_param: 0.1
   con_loss: True
   con_loss_img: False

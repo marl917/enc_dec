@@ -10,7 +10,7 @@ encoder:
 discriminator:
   name: dcgan_deep_onlylocal_clust_bigan
   kwargs:
-    qhead_withImg: False
+    qhead_withImg: True
   nlabels: 1
   n_locallabels: 10
 label_generator:
@@ -27,6 +27,6 @@ label_discriminator:
   conditioning: unconditional
 inherit_from: configs/cifar/default.yaml
 training:
-  out_dir: output/cifar/K2_10_BiGAN_DecdetOnSeg_NoCONLOSS_ImgSeg_qHeadWithImgFalse
+  out_dir: output/cifar/K2_10_BiGAN_DecdetOnSeg_NoCONLOSS_ImgSeg_qHeadWithImgFalse_old
   use_disc: True
   con_loss: True

@@ -6,6 +6,7 @@ import torch.utils.data.distributed
 from gan_training.models import blocks
 from torch.autograd import Variable
 
+
 class SEANDecoder(nn.Module):
     def __init__(self,
                  local_nlabels=0,
@@ -30,7 +31,6 @@ class SEANDecoder(nn.Module):
         self.up_1 = blocks.SEANResnetBlock(8 * ngf, 4 * ngf, local_nlabels)
         self.up_2 = blocks.SEANResnetBlock(4 * ngf, 2 * ngf, local_nlabels)
         self.up_3 = blocks.SEANResnetBlock(2 * ngf, 1 * ngf, local_nlabels, use_rgb=False)
-        # self.up_3 = blocks.SPADEResnetBlock(2 * ngf, 1 * ngf, local_nlabels)
         self.conv_img = nn.Conv2d(ngf, 3, 3, padding=1)
 
     def forward(self, seg, input=None):  # input=z
@@ -40,25 +40,21 @@ class SEANDecoder(nn.Module):
         out = self.fc(out)
 
         x = self.head_0(out, seg, style_codes)
-        # x = self.head_0(out, seg)
         x = self.up(x)
         x = self.G_middle_0(x, seg, style_codes)
-        # x = self.G_middle_0(x, seg)
         x = self.up(x)
         x = self.up_1(x, seg, style_codes)
-        # x = self.up_1(x, seg)
         x = self.up(x)
         x = self.up_2(x, seg, style_codes)
-        # x = self.up_2(x, seg)
         x = self.up(x)
         x = self.up_3(x, seg, style_codes)
-        # x = self.up_3(x, seg)
 
         x = self.conv_img(F.leaky_relu(x, 2e-1))
         x = torch.tanh(x)
         # print("output of decoder : ", torch.min(x), torch.max(x))
 
         return x
+
 
 class Decoder(nn.Module):
     def __init__(self,
@@ -77,19 +73,12 @@ class Decoder(nn.Module):
         self.deterministicOnSeg = deterministicOnSeg
         print("Decoder only depends on Segmentation : ", self.deterministicOnSeg)
 
-        # if conditioning == 'embedding':
-        #     self.get_latent = blocks.LatentEmbeddingConcat(nlabels, embed_dim)
-        #     self.fc = nn.Linear(z_dim + embed_dim, self.sh * self.sw * ngf * 8)
-        # elif conditioning == 'unconditional':
         self.get_latent = blocks.Identity()
         if self.deterministicOnSeg:
             self.fc = nn.Conv2d(local_nlabels, ngf * 8, 3, padding=1)
         else:
             self.fc = nn.Linear(z_dim, self.sh * self.sw * ngf * 8)
-        # else:
-        #     raise NotImplementedError(
-        #         f"{conditioning} not implemented for generator")
-        # print("in decoder : ", local_nlabels)
+
         self.up = nn.Upsample(scale_factor=2)
         self.head_0 = blocks.SPADEResnetBlock(8 * ngf, 8 * ngf, local_nlabels)
         self.G_middle_0 = blocks.SPADEResnetBlock(8 * ngf, 8 * ngf, local_nlabels)
@@ -99,8 +88,6 @@ class Decoder(nn.Module):
         self.up_3 = blocks.SPADEResnetBlock(2 * ngf, 1 * ngf, local_nlabels)
         self.conv_img = nn.Conv2d(ngf, 3, 3, padding=1)
 
-
-
     def forward(self, seg, input=None, y=None):  # input=z
         # alternative : downsample label map
         if self.deterministicOnSeg:
@@ -108,6 +95,7 @@ class Decoder(nn.Module):
             out = self.fc(out)
         else:
             out = self.get_latent(input, y)
+            # print("out size in decoder : ", out.size())
             out = self.fc(out)
             out = out.view(out.size(0), -1, self.sh, self.sw)
         x = self.head_0(out, seg)
@@ -126,21 +114,24 @@ class Decoder(nn.Module):
 
         return x
 
+
+
 class LabelGenerator(nn.Module):
     def __init__(self,
-                 label_size,
                  z_dim=128,
                  local_nlabels=0,
                  ngf=64,
+                 embed_dim=256,
+                 label_size=0,
                  **kwargs):
         super(LabelGenerator, self).__init__()
 
-        print("value of label size in LabelGenerator : ", label_size)
         self.sw = label_size // (2 ** 2)
         self.sh = self.sw
-        nc= local_nlabels
 
-        self.fc = nn.Linear(z_dim, self.sh*self.sw * ngf * 8)
+        nc = local_nlabels
+
+        self.fc = nn.Linear(z_dim, self.sh * self.sw * ngf * 8)
 
         bn = blocks.BatchNorm2d
 
@@ -158,7 +149,7 @@ class LabelGenerator(nn.Module):
         self.conv2bis = nn.ConvTranspose2d(ngf * 4, ngf * 2, 3, 1, 1)
         self.bn2bis = bn(ngf * 2)
 
-        self.conv_out = nn.Sequential(nn.Conv2d(ngf*2, nc, 3, 1, 1), nn.LogSoftmax(dim=1))
+        self.conv_out = nn.Sequential(nn.Conv2d(ngf * 2, nc, 3, 1, 1), nn.LogSoftmax(dim=1))
 
         self.FloatTensor = torch.cuda.FloatTensor if True \
             else torch.FloatTensor  # is_cuda
@@ -172,7 +163,75 @@ class LabelGenerator(nn.Module):
         return F.softmax(y / temperature, dim=1), y
 
     def gumble_softmax(self, logits):
-        y, y_unorm= self.gumbel_softmax_sample(logits, temperature=1.0)
+        y, y_unorm = self.gumbel_softmax_sample(logits, temperature=1.0)
+        x = torch.argmax(y, dim=1)
+        x = torch.unsqueeze(x, dim=1)
+        bs, _, h, w = x.size()
+        input_label = self.FloatTensor(bs, self.local_nlabels, h, w).zero_()
+        y_hard = input_label.scatter_(1, x.long().cuda(), 1.0)
+        return (y_hard - y).detach() + y, y_unorm
+
+    def forward(self, input, y=None):
+        out = self.fc(input)
+
+        out = out.view(out.size(0), -1, self.sh, self.sw)
+        out = F.relu(self.bn1(self.conv1(out), y))
+        out = F.relu(self.bn1bis(self.conv1bis(out), y))
+        out = F.relu(self.bn2(self.conv2(out), y))
+        out = F.relu(self.bn2bis(self.conv2bis(out), y))
+        logits = self.conv_out(out)
+        label_map, y_unorm = self.gumble_softmax(logits)
+        return y_unorm, label_map
+
+class Encoder(nn.Module):
+    def __init__(self,
+                 local_nlabels=None,
+                 nc=3,
+                 ndf=64,
+                 **kwargs):
+        super(Encoder, self).__init__()
+
+        # assert conditioning != 'unconditional' or nlabels == 1
+
+        self.FloatTensor = torch.cuda.FloatTensor if True \
+            else torch.FloatTensor  # is_cuda
+
+        self.local_nlabels = local_nlabels
+
+        self.conv1 = nn.Sequential(nn.Conv2d(3, ndf, 3, 1, 1),
+                                   nn.InstanceNorm2d(ndf),
+                                   nn.LeakyReLU(0.2, inplace=True))
+
+        self.conv2 = nn.Sequential(nn.Conv2d(ndf, ndf, 4, 2, 1),
+                                   nn.InstanceNorm2d(ndf),
+                                   nn.LeakyReLU(0.2, inplace=True))
+
+        self.conv3 = nn.Sequential(nn.Conv2d(ndf, ndf * 2, 3, 1, 1),
+                                   nn.InstanceNorm2d(ndf * 2),
+                                   nn.LeakyReLU(0.2, inplace=True))
+
+        self.conv4 = nn.Sequential(nn.Conv2d(ndf * 2, ndf * 2, 4, 2, 1),
+                                   nn.InstanceNorm2d(ndf * 2),
+                                   nn.LeakyReLU(0.2, inplace=True))
+
+        self.conv5 = nn.Sequential(nn.Conv2d(ndf * 2, ndf * 4, 3, 1, 1),
+                                   nn.InstanceNorm2d(ndf * 4),
+                                   nn.LeakyReLU(0.2, inplace=True))
+
+        self.local_FeatureMapping = blocks.local_FeatureMapping(num_classes=self.local_nlabels,
+                                                                n_channels=ndf * 4)  # modified : remove dilatation
+        self.logSoftmax = nn.LogSoftmax(dim=1)
+
+    def sample_gumbel(self, shape, eps=1e-20):
+        U = torch.rand(shape).cuda()
+        return -Variable(torch.log(-torch.log(U + eps) + eps))
+
+    def gumbel_softmax_sample(self, logits, temperature):
+        y = logits + self.sample_gumbel(logits.size())
+        return F.softmax(y / temperature, dim=1), y
+
+    def gumble_softmax(self, logits):
+        y, y_unorm = self.gumbel_softmax_sample(logits, temperature=1.0)
         x = torch.argmax(y, dim=1)
         x = torch.unsqueeze(x, dim=1)
         bs, _, h, w = x.size()
@@ -181,17 +240,19 @@ class LabelGenerator(nn.Module):
         return (y_hard - y).detach() + y, y_unorm
 
     def forward(self, input):
+        out = self.conv1(input)
+        out = self.conv2(out)
+        out = self.conv3(out)
+        out = self.conv4(out)
+        out = self.conv5(out)  # out of size bs * 256 * 8 * 8
+        out = self.local_FeatureMapping(
+            out)  # local classifier for discriminator loss : map the features to K_2 classifiers : size K_2 * 8 * 8 label map
+        # print("size of out after enc", out.size())
+        logits = self.logSoftmax(out)
+        label_map, label_map_unorm = self.gumble_softmax(logits)
 
-        out = self.fc(input)
+        return label_map_unorm, label_map
 
-        out = out.view(out.size(0), -1, self.sh, self.sw)
-        out = F.relu(self.bn1(self.conv1(out)))
-        out = F.relu(self.bn1bis(self.conv1bis(out)))
-        out = F.relu(self.bn2(self.conv2(out)))
-        out = F.relu(self.bn2bis(self.conv2bis(out)))
-        logits = self.conv_out(out)
-        label_map, y_unorm = self.gumble_softmax(logits)
-        return y_unorm, label_map
 
 class MUNITEncoder(nn.Module):
     def __init__(self,
@@ -260,93 +321,26 @@ class MUNITEncoder(nn.Module):
 
         return label_map_unorm, label_map
 
-class Encoder(nn.Module):
-    def __init__(self,
-                 local_nlabels=None,
-                 nc=3,
-                 ndf=64,
-                 **kwargs):
-        super(Encoder, self).__init__()
-
-        # assert conditioning != 'unconditional' or nlabels == 1
-
-        self.FloatTensor = torch.cuda.FloatTensor if True \
-            else torch.FloatTensor  # is_cuda
-
-        self.local_nlabels = local_nlabels
-
-        self.conv1 = nn.Sequential(nn.Conv2d(nc, ndf, 3, 1, 1), nn.LeakyReLU(0.1))
-        self.conv2 = nn.Sequential(nn.Conv2d(ndf, ndf, 4, 2, 1), nn.LeakyReLU(0.1))
-        self.conv3 = nn.Sequential(nn.Conv2d(ndf, ndf * 2, 3, 1, 1), nn.LeakyReLU(0.1))
-        self.conv4 = nn.Sequential(nn.Conv2d(ndf * 2, ndf * 2, 4, 2, 1), nn.LeakyReLU(0.1))
-        self.conv5 = nn.Sequential(nn.Conv2d(ndf * 2, ndf * 4, 3, 1, 1), nn.LeakyReLU(0.1))
-
-        # self.conv1 = nn.Sequential(nn.Conv2d(nc, ndf, 3, 1, 1), nn.LeakyReLU(0.2, inplace=True))
-        # self.conv2 = nn.Sequential(nn.Conv2d(ndf, ndf, 4, 2, 1), nn.LeakyReLU(0.2, inplace=True))
-        # self.conv3 = nn.Sequential(nn.Conv2d(ndf, ndf * 2, 3, 1, 1), nn.LeakyReLU(0.2, inplace=True))
-        # self.conv4 = nn.Sequential(nn.Conv2d(ndf * 2, ndf * 2, 4, 2, 1), nn.LeakyReLU(0.2, inplace=True))
-        # self.conv5 = nn.Sequential(nn.Conv2d(ndf * 2, ndf * 4, 3, 1, 1), nn.LeakyReLU(0.2, inplace=True))
-
-        self.local_FeatureMapping = blocks.local_FeatureMapping(num_classes=self.local_nlabels,
-                                                                n_channels=ndf * 4)  # modified : remove dilatation
-        self.logSoftmax = nn.LogSoftmax(dim=1)
-
-
-    def sample_gumbel(self, shape, eps=1e-20):
-        U = torch.rand(shape).cuda()
-        return -Variable(torch.log(-torch.log(U + eps) + eps))
-
-    def gumbel_softmax_sample(self, logits, temperature):
-        y = logits + self.sample_gumbel(logits.size())
-        return F.softmax(y / temperature, dim=1), y
-
-    def gumble_softmax(self, logits):
-        y, y_unorm = self.gumbel_softmax_sample(logits, temperature=1.0)
-        x = torch.argmax(y, dim=1)
-        x = torch.unsqueeze(x, dim=1)
-        bs, _, h, w = x.size()
-        input_label = self.FloatTensor(bs, self.local_nlabels, h, w).zero_()
-        y_hard = input_label.scatter_(1, x.long().cuda(), 1.0)
-        return (y_hard - y).detach() + y, y_unorm
-
-    def forward(self, input):
-        out = self.conv1(input)
-        out = self.conv2(out)
-        out = self.conv3(out)
-        out = self.conv4(out)
-        out = self.conv5(out)  # out of size bs * 256 * 8 * 8
-        out = self.local_FeatureMapping(
-            out)  # local classifier for discriminator loss : map the features to K_2 classifiers : size K_2 * 8 * 8 label map
-
-        logits = self.logSoftmax(out)
-        label_map, label_map_unorm = self.gumble_softmax(logits)
-
-        return label_map_unorm, label_map
 
 
 class BiGANDiscriminator(nn.Module):
     def __init__(self,
                  local_nlabels=None,
-                 features='penultimate',
-                 pack_size=1,
-                 qhead_withImg=True,
 
                  nc=3,
                  ndf=64,
-                 size=0,
+                 img_size=0,
+                 label_size=0,
                  **kwargs):
         super(BiGANDiscriminator, self).__init__()
         # print("USING BiGAN Discriminator", "qhead disc only with img network :", qhead_withImg)
         self.ndf = ndf
         self.local_nlabels = local_nlabels
 
-        self.qhead_withImg = qhead_withImg
-
-        input_nc = 3
-        self.final_res = size // (2 ** 3)  # if conv5 and conv6 are added
+        # self.final_res = img_size // (2 ** 3)  # if conv5 and conv6 are added
 
         # inference over img
-        self.conv1 = nn.Sequential(nn.Conv2d(input_nc * pack_size, ndf, 3, 1, 1),
+        self.conv1 = nn.Sequential(nn.Conv2d(3, ndf, 3, 1, 1),
                                    nn.BatchNorm2d(ndf),
                                    nn.LeakyReLU(0.2, inplace=True))
 
@@ -366,6 +360,10 @@ class BiGANDiscriminator(nn.Module):
                                    nn.BatchNorm2d(ndf * 4),
                                    nn.LeakyReLU(0.2, inplace=True))
 
+        # self.conv6 = nn.Sequential(nn.Conv2d(ndf * 4, ndf * 4, 3, 1, 1),
+        #                            nn.BatchNorm2d(ndf * 4),
+        #                            nn.LeakyReLU(0.2, inplace=True))
+
         # inference over seg
         self.conv1z = nn.Sequential(nn.Conv2d(self.local_nlabels, ndf * 4, 1, 1, padding=0, bias=False),
                                     nn.LeakyReLU(0.2, inplace=True))
@@ -378,7 +376,9 @@ class BiGANDiscriminator(nn.Module):
         self.conv2xz = nn.Sequential(nn.Conv2d(ndf * 8, ndf * 8, 1, stride=1, bias=False),
                                      nn.LeakyReLU(0.2, inplace=True))
         self.conv3xz = nn.Sequential(nn.Conv2d(ndf * 8, 1, 1, stride=1, bias=False), nn.LeakyReLU(0.2, inplace=True))
+        # comment fc_out_joint to ouput a map of 8x8 to compute bin crossentropy on that :
         self.fc_out_joint = blocks.LinearUnconditionalLogits(8 * 8)
+        # self.conv4xz = nn.Sequential(nn.Conv2d(1, 1, 4, 2,1, bias=False), nn.LeakyReLU(0.2, inplace=True))
 
     def inf_x(self, img):
         out = self.conv1(img)  # to try : with dropout as in initial bigan model
@@ -386,6 +386,7 @@ class BiGANDiscriminator(nn.Module):
         out = self.conv3(out)
         out = self.conv4(out)
         out = self.conv5(out)
+        # out = self.conv6(out)
         return out
 
     def inf_seg(self, seg):
@@ -395,61 +396,60 @@ class BiGANDiscriminator(nn.Module):
 
     def inf_xseg(self, xseg):
         out = self.conv1xz(xseg)
-        forQdisc = self.conv2xz(out)
-        out = self.conv3xz(forQdisc)
+        out = self.conv2xz(out)
+        out = self.conv3xz(out)
         out = out.view(out.size(0), -1)
         out = self.fc_out_joint(out)
-        return forQdisc, out
+        return out
 
     def forward(self, input, seg):
         inputbis = self.inf_x(input)
         seg = self.inf_seg(seg)
 
         xseg = torch.cat((inputbis, seg), dim=1)
-        forQdisc, xseg = self.inf_xseg(xseg)
+        xseg = self.inf_xseg(xseg)
 
-        if not self.qhead_withImg:
-            forQdisc = forQdisc
-        else:
-            forQdisc = inputbis
+        forQdisc = inputbis
 
         return forQdisc, xseg
 
 
 class BiGANQHeadDiscriminator(nn.Module):
     def __init__(self,
-                 local_nlabels=None,
-                 z_dim_lab=1,
-                 features='penultimate',
-                 pack_size=1,
-                 qhead_withImg=True,
-                 nc=3,
+                 z_dim_img,
+                 z_dim_lab,
                  ndf=64,
                  size=0,
                  **kwargs):
         super(BiGANQHeadDiscriminator, self).__init__()
-        print("z_dim in qhead disc :", z_dim_lab)
+        print("z_dim in qhead disc :", z_dim_lab, z_dim_img)
         self.ndf = ndf
-
-        self.local_nlabels = local_nlabels
         input_nc = 3
-        if qhead_withImg:
-            self.conv1 = nn.Conv2d(ndf * 4, 256, 8, bias=False)
-        else:
-            self.conv1 = nn.Conv2d(ndf * 8, 256, 8, bias=False)
-        self.bn1 = nn.BatchNorm2d(256)
 
-        self.conv_mu = nn.Conv2d(256, z_dim_lab, 1)
-        self.conv_var = nn.Conv2d(256, z_dim_lab, 1)
+        # self.conv1_img = nn.Conv2d(ndf *4, 256, 8, bias=False)
+        #
+        # self.bn1_img = nn.BatchNorm2d(256)
+        #
+        # self.conv_mu_img = nn.Conv2d(256, z_dim_img, 1)
+        # self.conv_var_img = nn.Conv2d(256, z_dim_img, 1)
+
+        self.conv1_lab = nn.Conv2d(ndf * 4, 256, 8, bias=False)
+
+        self.bn1_lab = nn.BatchNorm2d(256)
+
+        self.conv_mu_lab = nn.Conv2d(256, z_dim_lab, 1)
+        self.conv_var_lab = nn.Conv2d(256, z_dim_lab, 1)
 
     def forward(self, x):
-        x = F.leaky_relu(self.bn1(self.conv1(x)), 0.1, inplace=True)
-        mu = self.conv_mu(x).squeeze()
-        var = torch.exp(self.conv_var(x).squeeze())
+        # x_img = F.leaky_relu(self.bn1_img(self.conv1_img(x)), 0.1, inplace=True)
+        # mu_img = self.conv_mu_img(x_img).squeeze()
+        # var_img = torch.exp(self.conv_var_img(x_img).squeeze())
         # print("size of mu and var", mu.size(), var.size(), torch.min(mu), torch.max(mu))
-        return mu, var,0,0
 
-
+        x_lab = F.leaky_relu(self.bn1_lab(self.conv1_lab(x)), 0.1, inplace=True)
+        mu_lab = self.conv_mu_lab(x_lab).squeeze()
+        var_lab = torch.exp(self.conv_var_lab(x_lab).squeeze())
+        return mu_lab, var_lab, 0, 0
 
 
 if __name__ == '__main__':

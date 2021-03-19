@@ -10,6 +10,7 @@ from torch import nn
 import torchvision
 from torchvision import transforms
 import sys
+from gan_training.models import scops_loss
 
 
 class Trainer(object):
@@ -27,6 +28,7 @@ class Trainer(object):
 
                  con_loss = False,
                  equiv_loss =False,
+                 concentration_loss = False,
 
                  lambda_LabConLoss=1,
                  n_locallabels=0,
@@ -54,9 +56,11 @@ class Trainer(object):
         self.con_loss = con_loss
         self.con_loss_img = con_loss_img
         self.equiv_loss = equiv_loss
+        self.concentration_loss = concentration_loss
         self.decDeterministic = decDeterministic
         print("TRAINING WITH CON LOSS : ", con_loss)
         print("TRAINING WITH EQUIV LOSS : ", equiv_loss)
+        print("TRAINING WITH CONCENTRATION LOSS FOR ENCODER", self.concentration_loss)
 
         if self.equiv_loss:
             self.cj_transform = transforms.Compose([
@@ -122,6 +126,11 @@ class Trainer(object):
         label_map_real_unorm, label_map_real= self.encoder(x_real)
         g_real_enc = self.discriminator(x_real, seg=label_map_real)
 
+        concentration_loss = torch.tensor(0., device = 'cuda')
+        if self.concentration_loss:
+            concentration_loss = self.compute_concentration_loss(label_map_real_unorm)
+            G_losses['concentration_loss_enc'] = concentration_loss.item()
+
         if len(g_fake)>2:
             gloss = torch.stack([self.compute_loss(g_fake_e, 1) for g_fake_e in g_fake[1:]]).sum() + torch.stack([self.compute_loss(g_real_enc_e, 0) for g_real_enc_e in g_real_enc[1:]]).sum()
         else:
@@ -150,7 +159,7 @@ class Trainer(object):
             equiv_loss = 0.1 * self.kl(F.log_softmax(label_tps_unorm, dim=1), F.softmax(true_label_trans, dim=1))
             G_losses['equiv_loss'] = equiv_loss.item()
 
-        tot_loss = (gloss + con_loss_lab + con_loss_img + equiv_loss).mean()
+        tot_loss = (gloss + con_loss_lab + con_loss_img + equiv_loss + concentration_loss).mean()
         tot_loss.backward()
 
         # for p in self.encoder.parameters():
@@ -165,10 +174,6 @@ class Trainer(object):
         #         print(total_norm)
 
         self.encdec_optimizer.step()
-
-        toggle_grad(self.encoder, False)
-        toggle_grad(self.decoder, False)
-        toggle_grad(self.label_generator, False)
 
         return G_losses
         
@@ -227,9 +232,6 @@ class Trainer(object):
         losses['dloss_fake'] = dloss_fake.item()
         losses['reg_loss'] = reg.item()
 
-
-        toggle_grad(self.discriminator, False)
-
         return losses
 
     def compute_loss(self, d_out, target):
@@ -255,6 +257,37 @@ class Trainer(object):
         reg = (compute_grad2(d_out, x_interp).sqrt() - center).pow(2).mean()
 
         return reg
+
+    def get_variance(self,part_map, x_c, y_c):
+
+        h, w = part_map.shape
+        x_map, y_map = scops_loss.get_coordinate_tensors(h, w)
+
+        v_x_map = (x_map - x_c) * (x_map - x_c)
+        v_y_map = (y_map - y_c) * (y_map - y_c)
+
+        v_x = (part_map * v_x_map).sum()
+        v_y = (part_map * v_y_map).sum()
+        return v_x, v_y
+
+    def compute_concentration_loss(self,pred_softmax):
+        B, C, H, W = pred_softmax.shape
+        loss = 0
+        epsilon = 1e-3
+        centers_all = scops_loss.batch_get_centers(pred_softmax)
+        for b in range(B):
+            centers = centers_all[b]
+            for c in range(C):
+                # normalize part map as spatial pdf
+                part_map = pred_softmax[b, c, :, :] + epsilon  # prevent gradient explosion
+                k = part_map.sum()
+                part_map_pdf = part_map / k
+                x_c, y_c = centers[c]
+                v_x, v_y = self.get_variance(part_map_pdf, x_c, y_c)
+                loss_per_part = (v_x + v_y)
+                loss = loss_per_part + loss
+        loss = loss / B
+        return loss / B
 
 
 # Utility functions

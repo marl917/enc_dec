@@ -17,7 +17,7 @@ label_generator:
     deeper_arch: False
 inherit_from: configs/cifar/default.yaml
 training:
-  out_dir: output/cifar/labelRes8_K10_ZLab50_wosean_detOnSeg_Compare_woBNEnc
+  out_dir: output/cifar/labelRes8_K10_ZLab50_wosean_detOnSeg_Compare_wInstNormEnc
   reg_param: 0.1
   con_loss: True
   con_loss_img: False

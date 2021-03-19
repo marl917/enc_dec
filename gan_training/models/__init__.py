@@ -10,6 +10,7 @@ decoder_dict = {
 
 encoder_dict = {
     'cifar_bigan':cifar_BiGAN.Encoder,
+    'cifar_bigan_munit': cifar_BiGAN.MUNITEncoder,
     'resnet': resnet.Encoder,
     'resnet_lsun': resnet_lsun.Encoder,
     'resnet_lsun256': resnet_lsun256.Encoder,

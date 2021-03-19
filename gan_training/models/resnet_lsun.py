@@ -42,15 +42,15 @@ class Decoder(nn.Module):
         self.up = nn.Upsample(scale_factor=2)
 
 
-        self.head_0 = blocks.SPADEResnetBlock(16 * ngf, 16 * ngf, local_nlabels,self.deterministicOnSeg)
+        self.head_0 = blocks.SPADEResnetBlock(16 * ngf, 16 * ngf, local_nlabels)
 
-        self.G_middle_0 = blocks.SPADEResnetBlock(16 * ngf, 16 * ngf,local_nlabels,self.deterministicOnSeg)
-        self.G_middle_1 = blocks.SPADEResnetBlock(16 * ngf, 16 * ngf, local_nlabels,self.deterministicOnSeg)
+        self.G_middle_0 = blocks.SPADEResnetBlock(16 * ngf, 16 * ngf,local_nlabels)
+        self.G_middle_1 = blocks.SPADEResnetBlock(16 * ngf, 16 * ngf, local_nlabels)
 
-        self.up_0 = blocks.SPADEResnetBlock(16 * ngf, 8 * ngf, local_nlabels,self.deterministicOnSeg)
-        self.up_1 = blocks.SPADEResnetBlock(8 * ngf, 4 * ngf, local_nlabels,self.deterministicOnSeg)
-        self.up_2 = blocks.SPADEResnetBlock(4 * ngf, 2 * ngf, local_nlabels,self.deterministicOnSeg)
-        self.up_3 = blocks.SPADEResnetBlock(2 * ngf, 1 * ngf, local_nlabels,self.deterministicOnSeg)
+        self.up_0 = blocks.SPADEResnetBlock(16 * ngf, 8 * ngf, local_nlabels)
+        self.up_1 = blocks.SPADEResnetBlock(8 * ngf, 4 * ngf, local_nlabels)
+        self.up_2 = blocks.SPADEResnetBlock(4 * ngf, 2 * ngf, local_nlabels)
+        self.up_3 = blocks.SPADEResnetBlock(2 * ngf, 1 * ngf, local_nlabels)
         self.conv_img = nn.Conv2d(ngf, 3, 3, padding=1)
 
     def forward(self, seg, input=None):  #input=z

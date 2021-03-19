@@ -1,9 +1,8 @@
 decoder:
-  name: cifar_bigan_sean
+  name: cifar_bigan
   deterministicOnSeg: True
-  zdim: 64
+  zdim: 1
 encoder:
-  name: cifar_bigan_munit
   kwargs:
     deeper_arch: False
     classifier_mod: False
@@ -13,18 +12,21 @@ discriminator:
 label_generator:
   zdim: 50
   label_size: 8
-  n_locallabels: 5
+  n_locallabels: 10
   kwargs:
     deeper_arch: False
 inherit_from: configs/cifar/default.yaml
 training:
-  out_dir: output/cifar/labelRes8_K5_ZImg64_ZLab50_sean_munit
+  out_dir: output/cifar/labelRes8_K10_ZLab50_wosean_detOnSeg_Compare_Old_conce_loss
   reg_param: 0.1
   con_loss: True
   con_loss_img: False
   lambda_LabConLoss: 0.1
   entropy_loss: False
+  concentration_loss: True
   take_model_average: False
   fid_every: 10000
-  sample_every: 1000
+  sample_every: 200
+  log_every: 200
+
 

@@ -276,6 +276,7 @@ def main():
                       con_loss = config['training']['con_loss'] if 'con_loss' in config['training'] else False,
                       con_loss_img=config['training']['con_loss_img'] if 'con_loss_img' in config['training'] else True,
                       equiv_loss=  config['training']['equiv_loss'] if 'equiv_loss' in config['training'] else False,
+                      concentration_loss=config['training']['concentration_loss'] if 'concentration_loss' in config['training'] else False,
                       decDeterministic = config['decoder']['deterministicOnSeg'],
                       lambda_LabConLoss = config['training']['lambda_LabConLoss'] if 'lambda_LabConLoss' in config['training'] else 1,
                       n_locallabels=config['label_generator']['n_locallabels'],
@@ -309,15 +310,15 @@ def main():
         # logger.add_imgs(x, 'all', 10)
         # logger.add_imgs(x_mod,"all",11)
         # sys.exit()
-        z_test = zdist.sample((ntest,))
-        x, lab_color = evaluator.create_samples(x_test, z_test)
-        logger.add_imgs(x, 'all', 1)
-        logger.add_label_map(lab_color, 'all',  2)
-
-        co = evaluator.display_colors()
-        logger.add_label_map(co, 'labels_code_color', 100000)
-
-
+        # z_test = zdist.sample((ntest,))
+        # x, lab_color = evaluator.create_samples(x_test, z_test)
+        # logger.add_imgs(x, 'all', 1)
+        # logger.add_label_map(lab_color, 'all',  2)
+        #
+        # co = evaluator.display_colors()
+        # logger.add_label_map(co, 'labels_code_color', 100000)
+        #
+        #
         # sys.exit()
         for i in range(10):
             z_lab = zdist_lab.sample((n_samples,))
@@ -386,6 +387,7 @@ def main():
                 x, lab_color = evaluator.create_samples(x_test, z_test)
                 logger.add_imgs(x, 'all', it)
                 logger.add_label_map(lab_color, 'all', it+2)
+
 
                 z_lab = zdist_lab.sample((ntest,))
                 x,_ = evaluator.create_samples_labelGen(z_test, z_lab, out_dir=out_dir)

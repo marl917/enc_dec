@@ -64,7 +64,12 @@ class SeededSampler():
             sampler=None,
             drop_last=True)
 
-        self.zdist = get_zdist(self.config['z_dist']['type'], self.config['z_dist']['dim'])
+        if 'sean' in self.config['decoder']['name']:
+            self.zdist = get_zdist(self.config['z_dist']['type'],
+                              (self.config['label_generator']['n_locallabels'], self.config['decoder']['zdim']))
+        else:
+            self.zdist = get_zdist(self.config['z_dist']['type'], self.config['decoder']['zdim'])
+
         self.zdist_lab = get_zdist(self.config['z_dist']['type'], self.config['label_generator']['zdim'])
     def sample(self, nimgs):
         '''
